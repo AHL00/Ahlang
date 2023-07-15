@@ -146,7 +146,7 @@ impl<'a> Parser<'a> {
             lexer::Token::LET => self.parse_let(),
             lexer::Token::EOF => Ok(()),
             _ => Err(format!(
-                "Unexpected token: {:?}",
+                "[E001] Unexpected token: {:?}",
                 self.tokens[self.current_token]
             )),
         };
@@ -178,19 +178,49 @@ impl<'a> Parser<'a> {
         // Current token is the first token of the expression
         let mut expr: Option<Box<AstNode<'a>>> = None;
 
-        // Find the distance to the next semicolon
-        let mut distance_to_semicolon: usize = 0;
+        // // Find the distance to the next semicolon or RPAREN than concerns this expression
+        // let mut distance_to_semicolon: usize = 0;
+        // for token in &self.tokens[self.current_token..] {
+        //     if *token == lexer::Token::SEMICOLON {
+        //         break;
+        //     }
+
+        //     distance_to_semicolon += 1;
+        // }
+
+        // If this is an inner expression, the end is the next RPAREN
+        // If the number of LPARENs and RPARENs up to a point is equal, and another RPAREN is found,
+        // then the expression has ended
+        println!("Current token: {:?} {{\n", &self.tokens[self.current_token]);
+        let starting_token = self.current_token;
+
+        let mut distance_to_end: usize = 0;
+        let mut lparen_count: usize = 0;
+        let mut rparen_count: usize = 0;
+        println!("Distance count\n-------------------");
         for token in &self.tokens[self.current_token..] {
+            println!("Token: {:?}", token);
+            if *token == lexer::Token::LPAREN {
+                lparen_count += 1;
+            } else if *token == lexer::Token::RPAREN {
+                if lparen_count == rparen_count {
+                    break;
+                }
+                rparen_count += 1;
+            }
+
             if *token == lexer::Token::SEMICOLON {
                 break;
             }
 
-            distance_to_semicolon += 1;
+            distance_to_end += 1;
         }
+        println!("distance to end: {}\n--------------------\n", distance_to_end);
 
-        if distance_to_semicolon == 0 {
-            return Err("Expected an expression".to_string());
-        } else if distance_to_semicolon == 1 {
+
+        if distance_to_end == 0 {
+            return Err("[E002] Expected an expression".to_string());
+        } else if distance_to_end == 1 {
             // If the distance is 1, then the expression is a literal or identifier
             expr = match &self.tokens[self.current_token] {
                 lexer::Token::IDENT(ident) => Some(Box::new(AstNode::EXPRESSION(ExpressionType::IDENTIFIER(ident)))),
@@ -216,10 +246,10 @@ impl<'a> Parser<'a> {
                     }
                 }
                 _ => {
-                    return Err("Expected an expression".to_string());
+                    return Err("[E003] Expected an expression".to_string());
                 }
             }
-        } else if distance_to_semicolon == 2 {
+        } else if distance_to_end == 2 {
             // Unary expression
             // Current token is the operator
             match &self.tokens[self.current_token] {
@@ -240,12 +270,12 @@ impl<'a> Parser<'a> {
                             Some(Box::new(AstNode::EXPRESSION(expr)))
                         }
                         _ => {
-                            return Err("Expected an expression".to_string());
+                            return Err("[E004] Expected an expression".to_string());
                         }
                     }
                 }
                 _ => {
-                    return Err("Expected an expression".to_string());
+                    return Err("[E005] Expected an expression".to_string());
                 }
             } 
 
@@ -262,16 +292,68 @@ impl<'a> Parser<'a> {
             // AS  5. Addition and subtraction
 
             // To go top down the AST, start with the last step and work our way up
-            
 
-            // If a LPAREN is found, create a split in the expression tree
+            // Recursive descent parser
+            // Current token is the first token of the expression
 
+            // Pseudo code:
+            // expr = parse_expression(precedence=0)
+            // while current_token != SEMICOLON:
+            //     expr = parse_infix(expr, precedence=0)
+            // return expr            
 
+            match &self.tokens[self.current_token] {
+                // starts with an operator
+                // Unary expression
+                lexer::Token::OPERATOR(op) => {
+                    expr = match op {
+                        lexer::OperatorType::MINUS => {
+                            // Current token is the operator
+                            // Next token is the expression
+                            self.current_token += 1;
+                            let expr = ExpressionType::PREFIX {operator: PrefixOperator::MINUS, right: self.parse_expr()? };
+                            Some(Box::new(AstNode::EXPRESSION(expr)))
+                        }
+                        lexer::OperatorType::NOT => {
+                            // Current token is the operator
+                            // Next token is the expression
+                            self.current_token += 1;
+                            let expr = ExpressionType::PREFIX {operator: PrefixOperator::NOT, right: self.parse_expr()? };
+                            Some(Box::new(AstNode::EXPRESSION(expr)))
+                        }
+                        _ => {
+                            return Err("[E006] Expected an expression".to_string());
+                        }
+                    }
+                }
+
+                // starts with a LPAREN
+                // Inner expression
+                lexer::Token::LPAREN => {
+                    // Current token is the LPAREN
+                    // Next token is the expression
+                    self.current_token += 1;
+                    
+                    let inner_expr = self.parse_expr()?;
+
+                    // Next token is the RPAREN
+                    // Functions should go to the end of their respective expression
+                    self.current_token += 1;
+
+                    expr = Some(inner_expr);
+                }
+
+                _ => {
+                    return Err("[E009] Expected an expression".to_string());
+                }
+            }
 
         }
 
+        println!("}} [{:?}] Current expr: {:?}", self.tokens[starting_token], expr);
+
         if expr.is_none() {
-            return Err("Failed to parse expression".to_string());
+            return Err("[E010] Failed to parse expression".to_string());
         } else {
             return Ok(expr.unwrap());
         }
@@ -286,7 +368,7 @@ impl<'a> Parser<'a> {
         let ident: &str = match self.tokens[self.current_token] {
             lexer::Token::IDENT(ident) => ident,
             _ => {
-                return Err("Expected identifier after let".to_string());
+                return Err("[E011] Expected identifier after let".to_string());
             }
         };
 
@@ -304,18 +386,18 @@ impl<'a> Parser<'a> {
                     type_
                 }
                 _ => {
-                    return Err("Expected type after colon".to_string());
+                    return Err("[E012] Expected type after colon".to_string());
                 }
             };
         } else {
             // TODO: infer type if colon is not present
-            return Err("Expected a colon, type inference is not yet supported".to_string());
+            return Err("[E013] Expected a colon, type inference is not yet supported".to_string());
         }
 
         // Next token is equals
         self.current_token += 1;
         if self.tokens[self.current_token] != lexer::Token::OPERATOR(lexer::OperatorType::ASSIGN) {
-            return Err("Expected assign operator after type".to_string());
+            return Err("[E014] Expected assign operator after type".to_string());
         }
 
         // Possible expressions:
@@ -336,7 +418,7 @@ impl<'a> Parser<'a> {
         // Next token is semicolon
         self.current_token += 1;
         if self.tokens[self.current_token] != lexer::Token::SEMICOLON {
-            return Err("Expected semicolon after expression".to_string());
+            return Err("[E015] Expected semicolon after expression".to_string());
         }
 
         // Add let statement to ast

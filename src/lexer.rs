@@ -24,14 +24,13 @@ pub enum Token<'a> {
     // },
     EOF,
 
-    // Identifiers
+    // Identifiers / literals / funcs
     IDENT(&'a str),
-    BUILT_IN_TYPE(&'a str),
-
-    // Literals
     LITERAL(LexerLiteralType<'a>),
-
+    FUNC(&'a str),
+    
     // Built-in functions
+    BUILT_IN_TYPE(&'a str),
     BUILT_IN_FUNC(&'a str),
 
     // Operators

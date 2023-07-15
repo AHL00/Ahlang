@@ -1,19 +1,41 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum LexerLiteralType<'a> {
+    INT(&'a str),
+    FLOAT(&'a str),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum OperatorType {
+    ASSIGN,
+    PLUS,
+    MINUS,
+    ASTERISK,
+    SLASH,
+    CARET,
+    NOT,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
     ILLEGAL,
+    // { TODO: Add line and column number to token to use in error messages
+    //     line: usize,
+    //     col: usize,
+    // },
     EOF,
 
     // Identifiers
     IDENT(&'a str),
-    TYPE(&'a str),
+    BUILT_IN_TYPE(&'a str),
 
     // Literals
-    INT(&'a str),
-    FLOAT(&'a str),
+    LITERAL(LexerLiteralType<'a>),
+
+    // Built-in functions
+    BUILT_IN_FUNC(&'a str),
 
     // Operators
-    ASSIGN,
-    PLUS,
+    OPERATOR(OperatorType),
 
     // Delimiters
     COMMA,
@@ -33,11 +55,12 @@ pub enum Token<'a> {
 }
 
 static KEYWORDS: [&str; 2] = ["fn", "let"];
-static TYPES: [&str; 2] = ["int", "float"];
+static BUILT_IN_TYPES: [&str; 2] = ["int", "float"];
+static BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
 pub struct Lexer<'a> {
     input: &'a str,
-    pub tokens: Vec<Token<'a>>,
+    tokens: Vec<Token<'a>>,
 }
 
 impl<'a> Lexer<'a> {
@@ -48,7 +71,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn tokenize(&mut self) -> Result<(), String> {
+    pub fn get_tokens(&self) -> &Vec<Token<'a>> {
+        &self.tokens
+    }
+
+    pub fn tokenize(&mut self) -> Result<&Vec<Token<'a>>, String> {
         // set token literal to slice of input str
         let mut char_iter = self.input.char_indices().peekable();
 
@@ -108,9 +135,9 @@ impl<'a> Lexer<'a> {
 
                 if float {
                     self.tokens
-                        .push(Token::FLOAT(&self.input[i..i + char_count]));
+                        .push(Token::LITERAL(LexerLiteralType::FLOAT(&self.input[i..i + char_count])));
                 } else {
-                    self.tokens.push(Token::INT(&self.input[i..i + char_count]));
+                    self.tokens.push(Token::LITERAL(LexerLiteralType::INT(&self.input[i..i + char_count])));
                 }
 
                 continue;
@@ -149,18 +176,27 @@ impl<'a> Lexer<'a> {
                     }
 
                     continue;
-                } else if TYPES.contains(&literal) {
-                    self.tokens.push(Token::TYPE(literal));
+                } else if BUILT_IN_TYPES.contains(&literal) {
+                    self.tokens.push(Token::BUILT_IN_TYPE(literal));
                     continue;
-                } else {
+                } else if BUILT_IN_FUNCS.contains(&literal) {
+                    self.tokens.push(Token::BUILT_IN_FUNC(literal));
+                    continue;
+                } 
+                else {
                     self.tokens.push(Token::IDENT(literal));
                     continue;
                 }
             }
 
             match char {
-                '=' => self.tokens.push(Token::ASSIGN),
-                '+' => self.tokens.push(Token::PLUS),
+                '=' => self.tokens.push(Token::OPERATOR(OperatorType::ASSIGN)),
+                '+' => self.tokens.push(Token::OPERATOR(OperatorType::PLUS)),
+                '-' => self.tokens.push(Token::OPERATOR(OperatorType::MINUS)),
+                '*' => self.tokens.push(Token::OPERATOR(OperatorType::ASTERISK)),
+                '/' => self.tokens.push(Token::OPERATOR(OperatorType::SLASH)),
+                '!' => self.tokens.push(Token::OPERATOR(OperatorType::NOT)),
+                '^' => self.tokens.push(Token::OPERATOR(OperatorType::CARET)),
                 ',' => self.tokens.push(Token::COMMA),
                 ';' => self.tokens.push(Token::SEMICOLON),
                 ':' => self.tokens.push(Token::COLON),
@@ -176,6 +212,6 @@ impl<'a> Lexer<'a> {
 
         self.tokens.push(Token::EOF);
 
-        Ok(())
+        Ok(&self.tokens)
     }
 }

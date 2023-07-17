@@ -1,7 +1,9 @@
-use crate::lexer;
+use std::collections::HashMap;
+
+use crate::lexer::{self, Token};
 
 #[derive(Debug)]
-pub enum LiteralType<'a> {
+pub enum Literal<'a> {
     INT(i32),
     FLOAT(f64),
     STRING(&'a str),
@@ -9,7 +11,7 @@ pub enum LiteralType<'a> {
 }
 
 #[derive(Debug)]
-pub enum StatementType<'a> {
+pub enum Statement<'a> {
     LET {
         identifier: &'a str,
         type_: &'a str,
@@ -21,59 +23,35 @@ pub enum StatementType<'a> {
     RETURN,
 }
 
-#[derive(Debug)]
-pub enum InfixOperator {
-    PLUS,
-    MINUS,
-    ASTERISK,
-    SLASH,
-    CARET,
-}
-
-fn infix_precedence(operator: &InfixOperator) -> u8 {
+fn binding_power(operator: &lexer::Operator) -> (u8, u8) {
     match operator {
-        InfixOperator::PLUS => 1,
-        InfixOperator::MINUS => 1,
-        InfixOperator::ASTERISK => 2,
-        InfixOperator::SLASH => 2,
-        InfixOperator::CARET => 3,
+        // infix
+        lexer::Operator::PLUS | lexer::Operator::MINUS => (3, 4),
+        lexer::Operator::ASTERISK | lexer::Operator::SLASH => (5, 6),
+        lexer::Operator::CARET => (7, 8),
+
+        // prefix
+        lexer::Operator::NOT => (0, 10),
+        lexer::Operator::IDENTITY => (0, 10),
+        lexer::Operator::NEGATION => (0, 10),
     }
 }
 
 #[derive(Debug)]
-pub enum PrefixOperator {
-    NOT,
-    MINUS,
-}
-
-fn prefix_precedence(operator: &PrefixOperator) -> u8 {
-    match operator {
-        PrefixOperator::NOT => 4,
-        PrefixOperator::MINUS => 4,
-    }
-}
-
-#[derive(Debug)]
-pub enum PostfixOperator {
-    INCREMENT,
-    DECREMENT,
-}
-
-#[derive(Debug)]
-pub enum ExpressionType<'a> {
+pub enum Expression<'a> {
     IDENTIFIER(&'a str),
-    LITERAL(LiteralType<'a>),
+    LITERAL(Literal<'a>),
     PREFIX {
-        operator: PrefixOperator,
+        operator: lexer::Operator,
         right: Box<AstNode<'a>>,
     },
     POSTFIX {
         left: Box<AstNode<'a>>,
-        operator: PostfixOperator,
+        operator: lexer::Operator,
     },
     INFIX {
         left: Box<AstNode<'a>>,
-        operator: InfixOperator,
+        operator: lexer::Operator,
         right: Box<AstNode<'a>>,
     },
     CALL {
@@ -84,9 +62,9 @@ pub enum ExpressionType<'a> {
 
 #[derive(Debug)]
 pub enum AstNode<'a> {
-    EXPRESSION(ExpressionType<'a>),
+    EXPRESSION(Expression<'a>),
 
-    STATEMENT(StatementType<'a>),
+    STATEMENT(Statement<'a>),
 }
 
 #[derive(Debug)]
@@ -119,11 +97,6 @@ impl<'a> Parser<'a> {
         &self.ast
     }
 
-    pub fn ast_to_string(&self) -> String {
-        // TODO: Implement
-        String::new()
-    }
-
     pub fn parse(&mut self) -> Result<&Ast<'a>, String> {
         while self.current_token < self.tokens.len() {
             let res = self.parse_token();
@@ -138,6 +111,10 @@ impl<'a> Parser<'a> {
         }
 
         Ok(&self.ast)
+    }
+
+    fn peek(&self) -> &lexer::Token<'a> {
+        return &self.tokens[self.current_token + 1];
     }
 
     fn parse_token(&mut self) -> Result<(), String> {
@@ -172,190 +149,92 @@ impl<'a> Parser<'a> {
 
         Ok(())
     }
-
     /// Current token should be the first token of an expression
-    fn parse_expr(&mut self) -> Result<Box<AstNode<'a>>, String> {
+    fn parse_expr(
+        &mut self,
+        end_token: Token<'a>,
+        mut min_bp: Option<u8>,
+    ) -> Result<Box<AstNode<'a>>, String> {
         // Current token is the first token of the expression
-        let mut expr: Option<Box<AstNode<'a>>> = None;
+        let mut expr: Box<AstNode<'a>>;
 
-        // // Find the distance to the next semicolon or RPAREN than concerns this expression
-        // let mut distance_to_semicolon: usize = 0;
-        // for token in &self.tokens[self.current_token..] {
-        //     if *token == lexer::Token::SEMICOLON {
-        //         break;
-        //     }
+        match self.parse_expr_term() {
+            Ok(e) => expr = e,
+            Err(e) => return Err(e),
+        }
 
-        //     distance_to_semicolon += 1;
-        // }
+        if min_bp.is_none() {
+            min_bp = Some(0);
+        }
 
-        // If this is an inner expression, the end is the next RPAREN
-        // If the number of LPARENs and RPARENs up to a point is equal, and another RPAREN is found,
-        // then the expression has ended
-        println!("Current token: {:?} {{\n", &self.tokens[self.current_token]);
-        let starting_token = self.current_token;
-
-        let mut distance_to_end: usize = 0;
-        let mut lparen_count: usize = 0;
-        let mut rparen_count: usize = 0;
-        println!("Distance count\n-------------------");
-        for token in &self.tokens[self.current_token..] {
-            println!("Token: {:?}", token);
-            if *token == lexer::Token::LPAREN {
-                lparen_count += 1;
-            } else if *token == lexer::Token::RPAREN {
-                if lparen_count == rparen_count {
-                    break;
+        loop {
+            // This has to be peek and not current_token += 1 because
+            // every time we exit a recursive call, we arrive here.
+            // when parsing is done every layer of recursion will
+            // arrive at the end_token and break their loops
+            let op = match *self.peek() {
+                lexer::Token::OPERATOR(op) => op,
+                token => {
+                    if token == end_token {
+                        break;
+                    } else if token == lexer::Token::EOF {
+                        return Err("[Esmth] Unexpected EOF".to_string());
+                    }
+                    return Err("[Esmth] Expected operator".to_string());
                 }
-                rparen_count += 1;
-            }
+            };
 
-            if *token == lexer::Token::SEMICOLON {
+            let (l_bp, r_bp) = binding_power(&op);
+
+            if l_bp < min_bp.unwrap() {
                 break;
             }
 
-            distance_to_end += 1;
-        }
-        println!("distance to end: {}\n--------------------\n", distance_to_end);
+            self.current_token += 2;
 
+            let right = self.parse_expr(end_token, Some(r_bp));
 
-        if distance_to_end == 0 {
-            return Err("[E002] Expected an expression".to_string());
-        } else if distance_to_end == 1 {
-            // If the distance is 1, then the expression is a literal or identifier
-            expr = match &self.tokens[self.current_token] {
-                lexer::Token::IDENT(ident) => Some(Box::new(AstNode::EXPRESSION(ExpressionType::IDENTIFIER(ident)))),
-                lexer::Token::LITERAL(literal) => {
-                    use crate::lexer::LexerLiteralType;
-                    match literal {
-                        LexerLiteralType::FLOAT(f) => {
-                            // remove _ from float
-                            let f = f.replace("_", "");
-                            let expr = ExpressionType::LITERAL(LiteralType::FLOAT(
-                                f.parse::<f64>().unwrap(),
-                            ));
-                            Some(Box::new(AstNode::EXPRESSION(expr)))
-                        }
-                        LexerLiteralType::INT(i) => {
-                            // remove _ from int
-                            let i = i.replace("_", "");
-                            let expr = ExpressionType::LITERAL(LiteralType::INT(
-                                i.parse::<i32>().unwrap(),
-                            ));
-                            Some(Box::new(AstNode::EXPRESSION(expr)))
-                        }
-                    }
-                }
-                _ => {
-                    return Err("[E003] Expected an expression".to_string());
-                }
-            }
-        } else if distance_to_end == 2 {
-            // Unary expression
-            // Current token is the operator
-            match &self.tokens[self.current_token] {
-                lexer::Token::OPERATOR(op) => {
-                    expr = match op {
-                        lexer::OperatorType::MINUS => {
-                            // Current token is the operator
-                            // Next token is the expression
-                            self.current_token += 1;
-                            let expr = ExpressionType::PREFIX {operator: PrefixOperator::MINUS, right: self.parse_expr()? };
-                            Some(Box::new(AstNode::EXPRESSION(expr)))
-                        }
-                        lexer::OperatorType::NOT => {
-                            // Current token is the operator
-                            // Next token is the expression
-                            self.current_token += 1;
-                            let expr = ExpressionType::PREFIX {operator: PrefixOperator::NOT, right: self.parse_expr()? };
-                            Some(Box::new(AstNode::EXPRESSION(expr)))
-                        }
-                        _ => {
-                            return Err("[E004] Expected an expression".to_string());
-                        }
-                    }
-                }
-                _ => {
-                    return Err("[E005] Expected an expression".to_string());
-                }
-            } 
-
-        } else {
-            // Pratt parser
-
-            // Current token is the first token of the expression
-
-            // Order of precedence:
-            // B   1. Parentheses and grouping
-            // !-  2. Unary prefix operators
-            // I   3. Exponentiation
-            // DM  4. Multiplication and division
-            // AS  5. Addition and subtraction
-
-            // To go top down the AST, start with the last step and work our way up
-
-            // Recursive descent parser
-            // Current token is the first token of the expression
-
-            // Pseudo code:
-            // expr = parse_expression(precedence=0)
-            // while current_token != SEMICOLON:
-            //     expr = parse_infix(expr, precedence=0)
-            // return expr            
-
-            match &self.tokens[self.current_token] {
-                // starts with an operator
-                // Unary expression
-                lexer::Token::OPERATOR(op) => {
-                    expr = match op {
-                        lexer::OperatorType::MINUS => {
-                            // Current token is the operator
-                            // Next token is the expression
-                            self.current_token += 1;
-                            let expr = ExpressionType::PREFIX {operator: PrefixOperator::MINUS, right: self.parse_expr()? };
-                            Some(Box::new(AstNode::EXPRESSION(expr)))
-                        }
-                        lexer::OperatorType::NOT => {
-                            // Current token is the operator
-                            // Next token is the expression
-                            self.current_token += 1;
-                            let expr = ExpressionType::PREFIX {operator: PrefixOperator::NOT, right: self.parse_expr()? };
-                            Some(Box::new(AstNode::EXPRESSION(expr)))
-                        }
-                        _ => {
-                            return Err("[E006] Expected an expression".to_string());
-                        }
-                    }
-                }
-
-                // starts with a LPAREN
-                // Inner expression
-                lexer::Token::LPAREN => {
-                    // Current token is the LPAREN
-                    // Next token is the expression
-                    self.current_token += 1;
-                    
-                    let inner_expr = self.parse_expr()?;
-
-                    // Next token is the RPAREN
-                    // Functions should go to the end of their respective expression
-                    self.current_token += 1;
-
-                    expr = Some(inner_expr);
-                }
-
-                _ => {
-                    return Err("[E009] Expected an expression".to_string());
-                }
+            if right.is_err() {
+                return Err(right.unwrap_err());
             }
 
+            let right = right.unwrap();
+
+            expr = Box::new(AstNode::EXPRESSION(Expression::INFIX {
+                left: expr,
+                operator: op,
+                right,
+            }));
         }
 
-        println!("}} [{:?}] Current expr: {:?}", self.tokens[starting_token], expr);
+        return Ok(expr);
+    }
 
-        if expr.is_none() {
-            return Err("[E010] Failed to parse expression".to_string());
-        } else {
-            return Ok(expr.unwrap());
+    fn parse_expr_term(&mut self) -> Result<Box<AstNode<'a>>, String> {
+        match self.tokens[self.current_token] {
+            lexer::Token::IDENT(ident) => {
+                Ok(Box::new(AstNode::EXPRESSION(Expression::IDENTIFIER(ident))))
+            }
+            lexer::Token::LITERAL(lit) => Ok(Box::new(AstNode::EXPRESSION(Expression::LITERAL(
+                Self::lexer_to_ast_literal(lit),
+            )))),
+            _ => Err(format!(
+                "[E002] Unexpected token: {:?}",
+                self.tokens[self.current_token]
+            )),
+        }
+    }
+
+    fn lexer_to_ast_literal(literal: lexer::LexerLiteral<'a>) -> Literal<'a> {
+        match literal {
+            lexer::LexerLiteral::INT(int) => {
+                let int = int.replace("_", "");
+                Literal::INT(int.parse::<i32>().expect("Failed to parse int"))
+            }
+            lexer::LexerLiteral::FLOAT(float) => {
+                let float = float.replace("_", "");
+                Literal::FLOAT(float.parse::<f64>().expect("Failed to parse float"))
+            }
         }
     }
 
@@ -396,7 +275,7 @@ impl<'a> Parser<'a> {
 
         // Next token is equals
         self.current_token += 1;
-        if self.tokens[self.current_token] != lexer::Token::OPERATOR(lexer::OperatorType::ASSIGN) {
+        if self.tokens[self.current_token] != lexer::Token::ASSIGN {
             return Err("[E014] Expected assign operator after type".to_string());
         }
 
@@ -408,11 +287,13 @@ impl<'a> Parser<'a> {
 
         self.current_token += 1;
         let expr: Box<AstNode<'a>>;
-        let res = self.parse_expr();
+
+        let res = self.parse_expr(lexer::Token::SEMICOLON, None);
         if res.is_err() {
             return Err(res.unwrap_err());
         } else {
             expr = res.unwrap();
+            println!("{:?}", expr);
         }
 
         // Next token is semicolon
@@ -422,7 +303,7 @@ impl<'a> Parser<'a> {
         }
 
         // Add let statement to ast
-        self.ast.root.push(AstNode::STATEMENT(StatementType::LET {
+        self.ast.root.push(AstNode::STATEMENT(Statement::LET {
             identifier: ident,
             type_: type_,
             built_in_type: built_in_type,

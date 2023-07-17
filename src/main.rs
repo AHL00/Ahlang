@@ -4,7 +4,7 @@ mod parser;
 fn main() {
     let test_input = 
 "
-let x: int = -(-test);
+let x: int = 1 + 2 * 3 + 4;
 ";
 // let y: int = x;
 // let z: int = (-50000 + 50000) * 2;
@@ -31,6 +31,6 @@ let x: int = -(-test);
         println!("{:?}", p.get_ast());
     } else {
         println!("\n\nParsed successfully!");
-        println!("\n{:?}", p.get_ast());
+        println!("\n{:#?}", p.get_ast());
     }
 }

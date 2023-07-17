@@ -1,21 +1,26 @@
-#[derive(Debug, PartialEq, Clone)]
-pub enum LexerLiteralType<'a> {
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum LexerLiteral<'a> {
     INT(&'a str),
     FLOAT(&'a str),
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum OperatorType {
-    ASSIGN,
+// TODO: Move to operator.rs maybe lib.rs
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum Operator {
+    // Infix operators
     PLUS,
     MINUS,
     ASTERISK,
     SLASH,
     CARET,
+
+    // Unary operators
     NOT,
+    IDENTITY,
+    NEGATION,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Token<'a> {
     ILLEGAL,
     // { TODO: Add line and column number to token to use in error messages
@@ -26,15 +31,16 @@ pub enum Token<'a> {
 
     // Identifiers / literals / funcs
     IDENT(&'a str),
-    LITERAL(LexerLiteralType<'a>),
+    LITERAL(LexerLiteral<'a>),
     FUNC(&'a str),
-    
+
     // Built-in functions
     BUILT_IN_TYPE(&'a str),
     BUILT_IN_FUNC(&'a str),
 
     // Operators
-    OPERATOR(OperatorType),
+    ASSIGN,
+    OPERATOR(Operator),
 
     // Delimiters
     COMMA,
@@ -86,14 +92,14 @@ impl<'a> Lexer<'a> {
                 break;
             }
 
-            let (i, char) = i.unwrap();
+            let (i, current_char) = i.unwrap();
 
-            if char.is_whitespace() {
+            if current_char.is_whitespace() {
                 continue;
             }
 
-            // check for int/float literal
-            if char.is_digit(10) {
+            if current_char.is_digit(10) {
+                // check for int/float literal
                 let mut next_char_digit = true;
                 let mut char_count = 1;
                 let mut float = false;
@@ -133,14 +139,17 @@ impl<'a> Lexer<'a> {
                 }
 
                 if float {
-                    self.tokens
-                        .push(Token::LITERAL(LexerLiteralType::FLOAT(&self.input[i..i + char_count])));
+                    self.tokens.push(Token::LITERAL(LexerLiteral::FLOAT(
+                        &self.input[i..i + char_count],
+                    )));
                 } else {
-                    self.tokens.push(Token::LITERAL(LexerLiteralType::INT(&self.input[i..i + char_count])));
+                    self.tokens.push(Token::LITERAL(LexerLiteral::INT(
+                        &self.input[i..i + char_count],
+                    )));
                 }
 
                 continue;
-            } else if char.is_alphabetic() {
+            } else if current_char.is_alphabetic() {
                 // match keyword or identifier
                 // identifiers can not start with a digit
                 let mut next_char_alhpanum = true;
@@ -181,21 +190,34 @@ impl<'a> Lexer<'a> {
                 } else if BUILT_IN_FUNCS.contains(&literal) {
                     self.tokens.push(Token::BUILT_IN_FUNC(literal));
                     continue;
-                } 
-                else {
+                } else {
                     self.tokens.push(Token::IDENT(literal));
                     continue;
                 }
             }
 
-            match char {
-                '=' => self.tokens.push(Token::OPERATOR(OperatorType::ASSIGN)),
-                '+' => self.tokens.push(Token::OPERATOR(OperatorType::PLUS)),
-                '-' => self.tokens.push(Token::OPERATOR(OperatorType::MINUS)),
-                '*' => self.tokens.push(Token::OPERATOR(OperatorType::ASTERISK)),
-                '/' => self.tokens.push(Token::OPERATOR(OperatorType::SLASH)),
-                '!' => self.tokens.push(Token::OPERATOR(OperatorType::NOT)),
-                '^' => self.tokens.push(Token::OPERATOR(OperatorType::CARET)),
+            match current_char {
+                '=' => self.tokens.push(Token::ASSIGN),
+                '+' => {
+                    if self.is_prefix() {
+                        self.tokens.push(Token::OPERATOR(Operator::IDENTITY));
+                    } else {
+                        self.tokens.push(Token::OPERATOR(Operator::PLUS));
+                    }
+                },
+                '-' => {
+                    if self.is_prefix() {
+                        self.tokens.push(Token::OPERATOR(Operator::NEGATION));
+                    } else {
+                        self.tokens.push(Token::OPERATOR(Operator::MINUS));
+                    }
+                }
+                '*' => self.tokens.push(Token::OPERATOR(Operator::ASTERISK)),
+                '/' => self.tokens.push(Token::OPERATOR(Operator::SLASH)),
+                '!' => {
+                    self.tokens.push(Token::OPERATOR(Operator::NOT));
+                }
+                '^' => self.tokens.push(Token::OPERATOR(Operator::CARET)),
                 ',' => self.tokens.push(Token::COMMA),
                 ';' => self.tokens.push(Token::SEMICOLON),
                 ':' => self.tokens.push(Token::COLON),
@@ -212,5 +234,19 @@ impl<'a> Lexer<'a> {
         self.tokens.push(Token::EOF);
 
         Ok(&self.tokens)
+    }
+
+    fn is_prefix(&self) -> bool {
+        let last = self.tokens.last();
+        if last.is_none()
+            || !matches!(
+                last.unwrap(),
+                Token::LITERAL(_) | Token::IDENT(_) | Token::RPAREN | Token::RSQUARE | Token::RBRACE | Token::BUILT_IN_FUNC(_) | Token::FUNC(_) | Token::LPAREN | Token::LSQUARE | Token::LBRACE
+            )
+        {
+            return true;
+        } else {
+            return false;
+        }
     }
 }

@@ -4,7 +4,7 @@ mod parser;
 fn main() {
     let test_input = 
 "
-let x: int = 1 + 2 * 3 + 4;
+let x: int = -2^2 + 2;
 ";
 // let y: int = x;
 // let z: int = (-50000 + 50000) * 2;

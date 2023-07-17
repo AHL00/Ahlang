@@ -31,9 +31,16 @@ fn binding_power(operator: &lexer::Operator) -> (u8, u8) {
         lexer::Operator::CARET => (7, 8),
 
         // prefix
-        lexer::Operator::NOT => (0, 10),
-        lexer::Operator::IDENTITY => (0, 10),
-        lexer::Operator::NEGATION => (0, 10),
+        lexer::Operator::NOT => (0, 7),
+        lexer::Operator::IDENTITY => (0, 7),
+        lexer::Operator::NEGATION => (0, 7),
+    }
+}
+
+fn is_prefix_operator(operator: &lexer::Operator) -> bool {
+    match operator {
+        lexer::Operator::NOT | lexer::Operator::IDENTITY | lexer::Operator::NEGATION => true,
+        _ => false,
     }
 }
 
@@ -149,20 +156,37 @@ impl<'a> Parser<'a> {
 
         Ok(())
     }
-    /// Current token should be the first token of an expression
+
+    /// Current token should be the token before the first token of the expression
     fn parse_expr(
         &mut self,
         end_token: Token<'a>,
         mut min_bp: Option<u8>,
     ) -> Result<Box<AstNode<'a>>, String> {
         // Current token is the first token of the expression
-        let mut expr: Box<AstNode<'a>>;
+        self.current_token += 1;
+        let mut lhs: Box<AstNode<'a>>;
 
-        match self.parse_expr_term() {
-            Ok(e) => expr = e,
-            Err(e) => return Err(e),
+        match self.tokens[self.current_token] {
+            Token::OPERATOR(op) => {
+                // starts with an operator, so it's a prefix expression
+                if is_prefix_operator(&op) {
+                    let r_bp = binding_power(&op).1;
+                    let right = self.parse_expr(end_token, Some(r_bp))?;
+                    lhs = Box::new(AstNode::EXPRESSION(Expression::PREFIX { operator: op, right }));
+                } else {
+                    return Err("[Esmth] Expected prefix operator".to_string());
+                }
+            }
+            _ => {
+                match self.parse_expr_term() {
+                    Ok(e) => lhs = e,
+                    Err(e) => return Err(e),
+                }
+            }
         }
-
+        
+    
         if min_bp.is_none() {
             min_bp = Some(0);
         }
@@ -190,7 +214,7 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            self.current_token += 2;
+            self.current_token += 1;
 
             let right = self.parse_expr(end_token, Some(r_bp));
 
@@ -200,14 +224,14 @@ impl<'a> Parser<'a> {
 
             let right = right.unwrap();
 
-            expr = Box::new(AstNode::EXPRESSION(Expression::INFIX {
-                left: expr,
+            lhs = Box::new(AstNode::EXPRESSION(Expression::INFIX {
+                left: lhs,
                 operator: op,
                 right,
             }));
         }
 
-        return Ok(expr);
+        return Ok(lhs);
     }
 
     fn parse_expr_term(&mut self) -> Result<Box<AstNode<'a>>, String> {
@@ -285,7 +309,6 @@ impl<'a> Parser<'a> {
         // let x: int = 1 + 2; <- binary expression
         // let x: int; <- uninitialized variable
 
-        self.current_token += 1;
         let expr: Box<AstNode<'a>>;
 
         let res = self.parse_expr(lexer::Token::SEMICOLON, None);

@@ -179,9 +179,22 @@ impl<'a> Parser<'a> {
                 }
             }
             _ => {
-                match self.parse_expr_term() {
-                    Ok(e) => lhs = e,
-                    Err(e) => return Err(e),
+                lhs = match self.tokens[self.current_token] {
+                    lexer::Token::IDENT(ident) => {
+                        Box::new(AstNode::EXPRESSION(Expression::IDENTIFIER(ident)))
+                    }
+                    lexer::Token::LITERAL(lit) => Box::new(AstNode::EXPRESSION(Expression::LITERAL(
+                        Self::lexer_to_ast_literal(lit),
+                    ))),
+                    lexer::Token::LPAREN => {
+                        let expr = self.parse_expr(lexer::Token::RPAREN, None)?;
+                        self.current_token += 1;
+                        expr
+                    }
+                    _ => {return Err(format!(
+                        "[E002] Unexpected token: {:?}",
+                        self.tokens[self.current_token]
+                    ))},
                 }
             }
         }
@@ -232,21 +245,6 @@ impl<'a> Parser<'a> {
         }
 
         return Ok(lhs);
-    }
-
-    fn parse_expr_term(&mut self) -> Result<Box<AstNode<'a>>, String> {
-        match self.tokens[self.current_token] {
-            lexer::Token::IDENT(ident) => {
-                Ok(Box::new(AstNode::EXPRESSION(Expression::IDENTIFIER(ident))))
-            }
-            lexer::Token::LITERAL(lit) => Ok(Box::new(AstNode::EXPRESSION(Expression::LITERAL(
-                Self::lexer_to_ast_literal(lit),
-            )))),
-            _ => Err(format!(
-                "[E002] Unexpected token: {:?}",
-                self.tokens[self.current_token]
-            )),
-        }
     }
 
     fn lexer_to_ast_literal(literal: lexer::LexerLiteral<'a>) -> Literal<'a> {

@@ -3,50 +3,52 @@ use crate::lexer::{self, Token};
 // TODO: Proper errors and code cleanup
 
 #[derive(Debug)]
-pub struct Literal {
-    pub data: Option<ahlang::Data>,
-    pub type_: ahlang::DataType,
+pub(crate) struct Literal {
+    pub data: Option<crate::Data>,
+    pub type_: crate::DataType,
 }
 
 impl Literal {
-    pub fn new(type_: ahlang::DataType) -> Literal {
+    pub fn new(type_: crate::DataType) -> Literal {
         Literal { data: None, type_ }
     }
 }
 
 impl<'a> Literal {
-    pub fn set_data_from_str(&mut self, data_str: &'a str) {
+    pub fn set_data_from_str(&mut self, data_str: &String) {
         match self.type_ {
-            ahlang::DataType::Int32 => {
-                self.data = Some(ahlang::Data::Int32(
+            crate::DataType::Int32 => {
+                self.data = Some(crate::Data::Int32(
                     data_str.parse::<i32>().expect("Failed to parse int"),
                 ));
             }
-            ahlang::DataType::Float64 => {
-                self.data = Some(ahlang::Data::Float64(
+            crate::DataType::Float64 => {
+                self.data = Some(crate::Data::Float64(
                     data_str.parse::<f64>().expect("Failed to parse float"),
                 ));
             }
-            ahlang::DataType::Str => {
-                self.data = Some(ahlang::Data::Str(data_str.to_owned()));
+            crate::DataType::Str => {
+                self.data = Some(crate::Data::Str(data_str.to_owned()));
             }
-            ahlang::DataType::Char => {
-                self.data = Some(ahlang::Data::Char(
+            crate::DataType::Char => {
+                self.data = Some(crate::Data::Char(
                     data_str.chars().next().expect("Failed to parse char"),
                 ));
             }
-            ahlang::DataType::Bool => {
-                panic!("Bool literals should be set directly as lexer::Literal::Bool is of type bool")
+            crate::DataType::Bool => {
+                panic!(
+                    "Bool literals should be set directly as lexer::Literal::Bool is of type bool"
+                )
             }
         }
     }
 }
 
 #[derive(Debug)]
-pub enum Statement {
+pub(crate) enum Statement {
     Let {
         identifier: String,
-        type_: ahlang::DataType,
+        type_: crate::DataType,
         expr: Box<AstNode>,
     },
     If,
@@ -54,42 +56,42 @@ pub enum Statement {
     Return,
 }
 
-fn binding_power(operator: &ahlang::Operator) -> (u8, u8) {
+fn binding_power(operator: &crate::Operator) -> (u8, u8) {
     match operator {
         // infix
-        ahlang::Operator::Plus | ahlang::Operator::Minus => (3, 4),
-        ahlang::Operator::Asterisk | ahlang::Operator::Slash => (5, 6),
-        ahlang::Operator::Caret => (7, 8),
+        crate::Operator::Plus | crate::Operator::Minus => (3, 4),
+        crate::Operator::Asterisk | crate::Operator::Slash => (5, 6),
+        crate::Operator::Caret => (7, 8),
 
         // prefix
-        ahlang::Operator::Not => (0, 7),
-        ahlang::Operator::Identity => (0, 7),
-        ahlang::Operator::Negation => (0, 7),
+        crate::Operator::Not => (0, 7),
+        crate::Operator::Identity => (0, 7),
+        crate::Operator::Negation => (0, 7),
     }
 }
 
-fn is_prefix_operator(operator: &ahlang::Operator) -> bool {
+fn is_prefix_operator(operator: &crate::Operator) -> bool {
     match operator {
-        ahlang::Operator::Not | ahlang::Operator::Identity | ahlang::Operator::Negation => true,
+        crate::Operator::Not | crate::Operator::Identity | crate::Operator::Negation => true,
         _ => false,
     }
 }
 
 #[derive(Debug)]
-pub enum Expression {
+pub(crate) enum Expression {
     Identifier(String),
     Literal(Literal),
     Prefix {
-        operator: ahlang::Operator,
+        operator: crate::Operator,
         right: Box<AstNode>,
     },
     Postfix {
         left: Box<AstNode>,
-        operator: ahlang::Operator,
+        operator: crate::Operator,
     },
     Infix {
         left: Box<AstNode>,
-        operator: ahlang::Operator,
+        operator: crate::Operator,
         right: Box<AstNode>,
     },
     Call {
@@ -100,7 +102,7 @@ pub enum Expression {
 }
 
 #[derive(Debug)]
-pub enum AstNode {
+pub(crate) enum AstNode {
     Expression(Expression),
 
     Statement(Statement),
@@ -108,11 +110,11 @@ pub enum AstNode {
 
 #[derive(Debug)]
 pub struct Ast {
-    pub root: Vec<AstNode>,
+    pub(crate) root: Vec<AstNode>,
 }
 
 impl Ast {
-    fn new(tokens: &Vec<lexer::Token>) -> Ast {
+    fn new() -> Ast {
         Ast { root: Vec::new() }
     }
 
@@ -197,27 +199,44 @@ impl std::fmt::Display for Ast {
     }
 }
 
-pub struct Parser<'a> {
-    tokens: &'a Vec<lexer::Token<'a>>,
+static EMPTY_TOKENS: lexer::Tokens = lexer::Tokens { vec: Vec::new() };
+
+pub struct Parser {
     ast: Ast,
+    tokens: lexer::Tokens,
     current_token: usize,
 }
 
-impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a Vec<lexer::Token<'a>>) -> Parser<'a> {
+impl Parser {
+    pub fn new() -> Parser {
         Parser {
-            tokens,
-            ast: Ast::new(tokens),
+            ast: Ast::new(),
+            tokens: EMPTY_TOKENS.clone(),
             current_token: 0,
         }
+    }
+
+    pub fn set_tokens(&mut self, tokens: lexer::Tokens) {
+        self.tokens = tokens;
     }
 
     pub fn get_ast(&self) -> &Ast {
         &self.ast
     }
 
+    pub fn reset(&mut self) {
+        self.ast.root.clear();
+        self.tokens = EMPTY_TOKENS.clone();
+        self.current_token = 0;
+    }
+
+    /// Parses the tokens into an AST
     pub fn parse(&mut self) -> Result<&Ast, String> {
-        while self.current_token < self.tokens.len() {
+        if self.tokens.vec.len() == 0 {
+            return Err("[E000] No tokens to parse".to_string());
+        }
+
+        while self.current_token < self.tokens.vec.len() {
             let res = self.parse_token();
 
             if res.is_err() {
@@ -232,18 +251,18 @@ impl<'a> Parser<'a> {
         Ok(&self.ast)
     }
 
-    fn peek(&self) -> &lexer::Token<'a> {
-        return &self.tokens[self.current_token + 1];
+    fn peek(&self) -> &lexer::Token {
+        return &self.tokens.vec[self.current_token + 1];
     }
 
     fn parse_token(&mut self) -> Result<(), String> {
         // Used for both main and block statements
-        let parse_res = match self.tokens[self.current_token] {
+        let parse_res = match self.tokens.vec[self.current_token] {
             lexer::Token::Let => self.parse_let(),
             lexer::Token::Eof => Ok(()),
             _ => Err(format!(
                 "[E001] Unexpected token: {:?}",
-                self.tokens[self.current_token]
+                self.tokens.vec[self.current_token]
             )),
         };
 
@@ -254,7 +273,7 @@ impl<'a> Parser<'a> {
         let mut block: Vec<AstNode> = Vec::new();
 
         // iterate until we find a closing brace
-        while self.tokens[self.current_token] != lexer::Token::RBrace {
+        while self.tokens.vec[self.current_token] != lexer::Token::RBrace {
             let res = self.parse_token();
 
             if res.is_err() {
@@ -272,14 +291,14 @@ impl<'a> Parser<'a> {
     /// Current token should be the token before the first token of the expression
     fn parse_expr(
         &mut self,
-        end_token: &Token<'a>,
+        end_token: &Token,
         mut min_bp: Option<u8>,
     ) -> Result<Box<AstNode>, String> {
         // Current token is the first token of the expression
         self.current_token += 1;
         let mut lhs: Box<AstNode>;
 
-        match self.tokens[self.current_token] {
+        match self.tokens.vec[self.current_token] {
             Token::Operator(op) => {
                 // starts with an operator, so it's a prefix expression
                 if is_prefix_operator(&op) {
@@ -294,7 +313,7 @@ impl<'a> Parser<'a> {
                 }
             }
             _ => {
-                lhs = match self.tokens[self.current_token] {
+                lhs = match &self.tokens.vec[self.current_token] {
                     lexer::Token::Ident(ident) => Box::new(AstNode::Expression(
                         Expression::Identifier(ident.to_owned()),
                     )),
@@ -303,30 +322,30 @@ impl<'a> Parser<'a> {
 
                         match lit {
                             LexerLiteral::Int(data) => {
-                                let mut literal = Literal::new(ahlang::DataType::Int32);
+                                let mut literal = Literal::new(crate::DataType::Int32);
                                 literal.set_data_from_str(data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
-                            },
+                            }
                             LexerLiteral::Float(data) => {
-                                let mut literal = Literal::new(ahlang::DataType::Float64);
+                                let mut literal = Literal::new(crate::DataType::Float64);
                                 literal.set_data_from_str(data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
-                            },
+                            }
                             LexerLiteral::Str(data) => {
-                                let mut literal = Literal::new(ahlang::DataType::Str);
+                                let mut literal = Literal::new(crate::DataType::Str);
                                 literal.set_data_from_str(data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
-                            },
+                            }
                             LexerLiteral::Char(data) => {
-                                let mut literal = Literal::new(ahlang::DataType::Char);
+                                let mut literal = Literal::new(crate::DataType::Char);
                                 literal.set_data_from_str(data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
                             }
                             LexerLiteral::Bool(data) => {
-                                let mut literal = Literal::new(ahlang::DataType::Bool);
-                                literal.data = Some(ahlang::Data::Bool(data));
+                                let mut literal = Literal::new(crate::DataType::Bool);
+                                literal.data = Some(crate::Data::Bool(*data));
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
-                            },
+                            }
                         }
                     }
                     lexer::Token::LParen => {
@@ -337,7 +356,7 @@ impl<'a> Parser<'a> {
                     _ => {
                         return Err(format!(
                             "[E002] Unexpected token: {:?}",
-                            self.tokens[self.current_token]
+                            self.tokens.vec[self.current_token]
                         ))
                     }
                 }
@@ -397,7 +416,7 @@ impl<'a> Parser<'a> {
 
         // next token should be identifier
         self.current_token += 1;
-        let ident: &str = match self.tokens[self.current_token] {
+        let ident: String = match self.tokens.vec[self.current_token].clone() {
             lexer::Token::Ident(ident) => ident,
             _ => {
                 return Err("[E011] Expected identifier after let".to_string());
@@ -406,18 +425,18 @@ impl<'a> Parser<'a> {
 
         // Next token is colon, parse type
         self.current_token += 1;
-        let type_: ahlang::DataType;
+        let type_: crate::DataType;
 
-        if self.tokens[self.current_token] == lexer::Token::Colon {
+        if self.tokens.vec[self.current_token] == lexer::Token::Colon {
             self.current_token += 1;
-            type_ = match self.tokens[self.current_token] {
+            type_ = match &self.tokens.vec[self.current_token] {
                 lexer::Token::Ident(type_) => {
                     todo!("Custom types are not yet supported");
                     // TODO: check if type exists
                 }
                 lexer::Token::Type(type_) => {
-                    if ahlang::BUILT_IN_TYPES.contains_key(type_) {
-                        ahlang::BUILT_IN_TYPES.get(type_).unwrap().clone()
+                    if crate::BUILT_IN_TYPES.contains_key(type_.as_str()) {
+                        crate::BUILT_IN_TYPES.get(type_.as_str()).unwrap().clone()
                     } else {
                         return Err(format!("[E016] Unknown type: {}", type_));
                     }
@@ -433,7 +452,7 @@ impl<'a> Parser<'a> {
 
         // Next token is equals
         self.current_token += 1;
-        if self.tokens[self.current_token] != lexer::Token::Assign {
+        if self.tokens.vec[self.current_token] != lexer::Token::Assign {
             return Err("[E014] Expected assign operator after type".to_string());
         }
 
@@ -448,7 +467,7 @@ impl<'a> Parser<'a> {
 
         // Next token is semicolon
         self.current_token += 1;
-        if self.tokens[self.current_token] != lexer::Token::Semicolon {
+        if self.tokens.vec[self.current_token] != lexer::Token::Semicolon {
             return Err("[E015] Expected semicolon after expression".to_string());
         }
 

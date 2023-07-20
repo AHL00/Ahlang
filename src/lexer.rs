@@ -1,16 +1,14 @@
-use std::thread::current;
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Literal<'a> {
-    Int(&'a str),
-    Float(&'a str),
-    Str(&'a str),
-    Char(&'a str),
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum Literal {
+    Int(String),
+    Float(String),
+    Str(String),
+    Char(String),
     Bool(bool),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token<'a> {
+pub(crate) enum Token {
     Illegal,
     // { TODO: Add line and column number to token to use in error messages
     //     line: usize,
@@ -19,18 +17,18 @@ pub enum Token<'a> {
     Eof,
 
     // Identifiers / literals / funcs
-    Ident(&'a str),
-    Literal(Literal<'a>),
-    Func(&'a str),
+    Ident(String),
+    Literal(Literal),
+    Func(String),
 
-    Type(&'a str),
+    Type(String),
     
     // Built-in functions
-    built_in_func(&'a str),
+    built_in_func(String),
 
     // Operators
     Assign,
-    Operator(ahlang::Operator),
+    Operator(crate::Operator),
 
     // Delimiters
     Comma,
@@ -54,7 +52,7 @@ pub enum Token<'a> {
     Return,
 }
 
-pub static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
+pub(crate) static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
     "fn" => Token::Fn,
     "let" => Token::Let,
     "if" => Token::If,
@@ -64,24 +62,39 @@ pub static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
     "false" => Token::Literal(Literal::Bool(false)),
 };
 
-pub struct Lexer<'a> {
-    input: &'a str,
-    tokens: Vec<Token<'a>>,
+#[derive(Debug, Clone)]
+pub struct Tokens {
+    pub(crate) vec: Vec<Token>,
 }
 
-impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Lexer<'a> {
+pub struct Lexer {
+    input: String,
+    tokens: Tokens,
+}
+
+impl Lexer {
+    pub fn new() -> Lexer {
         Lexer {
-            input,
-            tokens: Vec::new(),
+            input: "".to_string(),
+            tokens: Tokens { vec: Vec::new() },
         }
     }
 
-    pub fn get_tokens(&self) -> &Vec<Token<'a>> {
+    pub(crate) fn get_tokens(&self) -> &Tokens {
         &self.tokens
     }
 
-    pub fn tokenize(&mut self) -> Result<&Vec<Token<'a>>, String> {
+    pub fn set_input(&mut self, input: String) {
+        self.input = input;
+    }
+
+    pub fn tokenize(&mut self) -> Result<Tokens, String> {
+        if self.input == "" {
+            return Err("Empty input string".to_string());
+        }
+
+        self.tokens.vec.clear();
+
         // set token literal to slice of input str
         let mut char_iter = self.input.char_indices().peekable();
 
@@ -147,8 +160,8 @@ impl<'a> Lexer<'a> {
                     return Err("Unexpected EOF".to_string());
                 }
 
-                self.tokens.push(Token::Literal(Literal::Str(
-                    &self.input[i + 1..i + char_count],
+                self.tokens.vec.push(Token::Literal(Literal::Str(
+                    self.input[i + 1..i + char_count].to_owned(),
                 )));
                 continue;
             }
@@ -178,8 +191,8 @@ impl<'a> Lexer<'a> {
                     return Err("Unexpected EOF".to_string());
                 }
 
-                self.tokens.push(Token::Literal(Literal::Char(
-                    &self.input[i + 1..i + char_count],
+                self.tokens.vec.push(Token::Literal(Literal::Char(
+                    self.input[i + 1..i + char_count].to_owned(),
                 )));
                 continue;
             }
@@ -225,12 +238,12 @@ impl<'a> Lexer<'a> {
                 }
 
                 if float {
-                    self.tokens.push(Token::Literal(Literal::Float(
-                        &self.input[i..i + char_count],
+                    self.tokens.vec.push(Token::Literal(Literal::Float(
+                        self.input[i..i + char_count].to_owned(),
                     )));
                 } else {
-                    self.tokens.push(Token::Literal(Literal::Int(
-                        &self.input[i..i + char_count],
+                    self.tokens.vec.push(Token::Literal(Literal::Int(
+                        self.input[i..i + char_count].to_owned(),
                     )));
                 }
 
@@ -258,65 +271,65 @@ impl<'a> Lexer<'a> {
                     }
                 }
 
-                let literal = &self.input[i..i + char_count];
+                let literal = self.input[i..i + char_count].to_owned();
 
                 if KEYWORDS.contains_key(&literal) {
-                    self.tokens.push(KEYWORDS[&literal].clone());
+                    self.tokens.vec.push(KEYWORDS[&literal].clone());
                     continue;
-                } else if ahlang::BUILT_IN_TYPES.contains_key(&literal) {
-                    self.tokens.push(Token::Type(literal));
+                } else if crate::BUILT_IN_TYPES.contains_key(&self.input[i..i + char_count]) {
+                    self.tokens.vec.push(Token::Type(literal));
                     continue;
-                } else if ahlang::BUILT_IN_FUNCS.contains(&literal) {
-                    self.tokens.push(Token::built_in_func(literal));
+                } else if crate::BUILT_IN_FUNCS.contains(& &self.input[i..i + char_count]) {
+                    self.tokens.vec.push(Token::built_in_func(literal));
                     continue;
                 } else {
-                    self.tokens.push(Token::Ident(literal));
+                    self.tokens.vec.push(Token::Ident(literal));
                     continue;
                 }
             }
 
             match current_char {
-                '=' => self.tokens.push(Token::Assign),
+                '=' => self.tokens.vec.push(Token::Assign),
                 '+' => {
                     if self.is_prefix() {
-                        self.tokens.push(Token::Operator(ahlang::Operator::Identity));
+                        self.tokens.vec.push(Token::Operator(crate::Operator::Identity));
                     } else {
-                        self.tokens.push(Token::Operator(ahlang::Operator::Plus));
+                        self.tokens.vec.push(Token::Operator(crate::Operator::Plus));
                     }
                 },
                 '-' => {
                     if self.is_prefix() {
-                        self.tokens.push(Token::Operator(ahlang::Operator::Negation));
+                        self.tokens.vec.push(Token::Operator(crate::Operator::Negation));
                     } else {
-                        self.tokens.push(Token::Operator(ahlang::Operator::Minus));
+                        self.tokens.vec.push(Token::Operator(crate::Operator::Minus));
                     }
                 }
-                '*' => self.tokens.push(Token::Operator(ahlang::Operator::Asterisk)),
-                '/' => self.tokens.push(Token::Operator(ahlang::Operator::Slash)),
+                '*' => self.tokens.vec.push(Token::Operator(crate::Operator::Asterisk)),
+                '/' => self.tokens.vec.push(Token::Operator(crate::Operator::Slash)),
                 '!' => {
-                    self.tokens.push(Token::Operator(ahlang::Operator::Not));
+                    self.tokens.vec.push(Token::Operator(crate::Operator::Not));
                 }
-                '^' => self.tokens.push(Token::Operator(ahlang::Operator::Caret)),
-                ',' => self.tokens.push(Token::Comma),
-                ';' => self.tokens.push(Token::Semicolon),
-                ':' => self.tokens.push(Token::Colon),
-                '(' => self.tokens.push(Token::LParen),
-                ')' => self.tokens.push(Token::RParen),
-                '{' => self.tokens.push(Token::LBrace),
-                '}' => self.tokens.push(Token::RBrace),
-                '[' => self.tokens.push(Token::LSquare),
-                ']' => self.tokens.push(Token::RSquare),
-                _ => self.tokens.push(Token::Illegal),
+                '^' => self.tokens.vec.push(Token::Operator(crate::Operator::Caret)),
+                ',' => self.tokens.vec.push(Token::Comma),
+                ';' => self.tokens.vec.push(Token::Semicolon),
+                ':' => self.tokens.vec.push(Token::Colon),
+                '(' => self.tokens.vec.push(Token::LParen),
+                ')' => self.tokens.vec.push(Token::RParen),
+                '{' => self.tokens.vec.push(Token::LBrace),
+                '}' => self.tokens.vec.push(Token::RBrace),
+                '[' => self.tokens.vec.push(Token::LSquare),
+                ']' => self.tokens.vec.push(Token::RSquare),
+                _ => self.tokens.vec.push(Token::Illegal),
             }
         }
 
-        self.tokens.push(Token::Eof);
+        self.tokens.vec.push(Token::Eof);
 
-        Ok(&self.tokens)
+        Ok(self.tokens.clone())
     }
 
     fn is_prefix(&self) -> bool {
-        let last = self.tokens.last();
+        let last = self.tokens.vec.last();
         if last.is_none()
             || !matches!(
                 last.unwrap(),

@@ -1,29 +1,42 @@
 use std::collections::HashMap;
 
-use ahlang::Data;
+use crate::{Data, parser};
 
 use crate::parser::{AstNode, Statement, Expression};
 
-pub struct Interpreter<'a> {
-    ast: &'a crate::parser::Ast,   
+pub struct Interpreter { 
     pub vars: HashMap<String, Data>
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new(ast: &'a crate::parser::Ast) -> Interpreter<'a> {
+// static EMPTY_AST: crate::parser::Ast = crate::parser::Ast {
+//     root: Vec::new()
+// };
+
+impl Interpreter {
+    pub fn new() -> Interpreter {
         Interpreter {
-            ast,
             vars: HashMap::new()
         }
     }
 
-    pub fn run(&mut self) {
-        for node in &self.ast.root {
+    pub fn run(&mut self, ast: &parser::Ast) -> Result<(), String> {
+       
+        if ast.root.len() == 0 {
+            return Err("AST is empty".to_string());
+        }
+
+        for node in &ast.root {
             let res = self.eval_statement(node);
             if res.is_err() {
-                println!("Error: {}", res.unwrap_err());
+                return Err(res.unwrap_err());
             }
         }
+
+        Ok(())
+    }
+
+    pub fn reset(&mut self) {
+        self.vars.clear();
     }
 
     fn allocate_var(&mut self, identifier: &String, data: &Data) {
@@ -61,13 +74,10 @@ impl<'a> Interpreter<'a> {
             _ => {
                 return Err("Expected statement".to_string());}
         }
-
-        
-
         Ok(())
     }
 
-    fn eval_stmt_let(&mut self, identifier: &String, type_: &ahlang::DataType, expr: &Box<AstNode>) -> Result<(), String> {
+    fn eval_stmt_let(&mut self, identifier: &String, type_: &crate::DataType, expr: &Box<AstNode>) -> Result<(), String> {
         let data: &Data;
 
         // evaluate expression

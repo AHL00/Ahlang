@@ -3,7 +3,6 @@
 - int
 - float
 - bool
-- tuple
 - array
 - vector
 
@@ -12,7 +11,7 @@
 ```
 fn main() -> () {
 
-}
+};
 ```
 
 ### Variable
@@ -34,42 +33,53 @@ struct Point {
     Point();
     ~Point();
     
-}
+};
 ```
 
-// enum
+## Enum
+```
 enum Direction {
     Up,
     Down,
     Left,
     Right,
-}
+};
+```
 
-// conditional
+## Conditional
+```
 if x == 5 {
     println!("x is five!");
 } else if x == 6 {
     println!("x is six!");
 } else {
     print("x is not five or six");
-}
+};
+```
 
-// loop
+## Loop
+```
 loop {
     println!("Loop forever!");
 }
+```
 
-// while
+## While
+```
 while x < 100 {
     x += 1;
 }
+```
 
-// for
+## For
+```
 for x in range(0, 10) {
     println!("{}", x); // x: int
 }
+```
 
-// match
+## Match
+```
 match x {
     1 => println!("one"),
     2 => println!("two"),
@@ -78,6 +88,9 @@ match x {
     5 => println!("five"),
     _ => println!("something else"),
 }
+```
 
-// string formatting
+## String formatting
+```
 fmt("Hello, {}!", "world"); // => "Hello, world!"
+```

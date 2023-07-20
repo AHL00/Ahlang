@@ -4,9 +4,9 @@ mod interpreter;
 
 fn main() {
     let test_input = "
-let y: i32 = x;
-let z: i32 = (-50000 + 50000) * 2;
-let test: f64 = 12 * (12.4 - x);
+    let y: i32 = 12;
+    let z: i32 = (50000 + 50000) * 2;
+    let test: f64 = 12 * (12.4);
 ";
 
     let start = std::time::Instant::now();
@@ -17,9 +17,8 @@ let test: f64 = 12 * (12.4 - x);
     let mut p = parser::Parser::new(l.get_tokens());
     let res = p.parse();
 
-    let end = std::time::Instant::now();
+    let parse_end = std::time::Instant::now();
 
-    
     println!("Source:\n--------");
     println!("{}\n", test_input);
 
@@ -40,8 +39,13 @@ let test: f64 = 12 * (12.4 - x);
         println!("{}\n\n", p.get_ast())
     }
 
-    println!("Lexing and parsing time: {:?}", end - start);
+    println!("Lexing and parsing time: {:?}", parse_end - start);
+
+    let i_start = std::time::Instant::now();
 
     let mut i = interpreter::Interpreter::new(p.get_ast());
     i.run();
+
+    println!("Interpreter time: {:?}", std::time::Instant::now() - i_start);
+    println!("Variables: {:?}", i.vars);
 }

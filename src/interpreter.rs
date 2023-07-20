@@ -6,7 +6,7 @@ use crate::parser::{AstNode, Statement};
 
 pub struct Interpreter<'a> {
     ast: &'a crate::parser::Ast<'a>,   
-    vars: HashMap<&'a str, Data<'a>>
+    pub vars: HashMap<&'a str, Data<'a>>
 }
 
 impl<'a> Interpreter<'a> {
@@ -67,16 +67,31 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn eval_stmt_let(&mut self, identifier: &&str, type_: &ahlang::DataType, expr: &Box<AstNode<'a>>) -> Result<(), String> {
+    fn eval_stmt_let(&mut self, identifier: &&'a str, type_: &ahlang::DataType, expr: &Box<AstNode<'a>>) -> Result<(), String> {
         println!("Evaluating LET statement");
-        // match *type_ {
+        let data: Data<'a>;
 
-        // }
+        // evaluate expression
+        let res = self.eval_expression(expr);
+        
+        if res.is_err() {
+            return Err(res.unwrap_err());
+        } else {
+            data = res.unwrap();
+        }
+
+        // check if type matches
+        if data.get_type() != *type_ {
+            return Err("Expression type does not match variable type".to_string());
+        }
+
+        // allocate variable
+        self.allocate_var(identifier, data);
 
         Ok(())
     }
 
-    fn eval_expression(&mut self, node: &AstNode<'a>) -> Result<Box<dyn Any>, String> {
+    fn eval_expression(&mut self, node: &AstNode<'a>) -> Result<Data<'a>, String> {
         // match node {
         //     AstNode::EXPRESSION(expr) => {
         //         match expr {
@@ -98,7 +113,9 @@ impl<'a> Interpreter<'a> {
         //     }
         // }
 
-        Ok(Box::new(()))
+        // Ok(Box::new(()))
+        let data = Data::Int32(12);
+        Ok(data)
     }
 
 }

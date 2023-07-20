@@ -4,61 +4,56 @@ pub enum Literal<'a> {
     Float(&'a str),
 }
 
-// TODO: Move to operator.rs maybe lib.rs
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum Operator {
-    // Infix operators
-    PLUS,
-    MINUS,
-    ASTERISK,
-    SLASH,
-    CARET,
-
-    // Unary operators
-    NOT,
-    IDENTITY,
-    NEGATION,
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
-    ILLEGAL,
+    Illegal,
     // { TODO: Add line and column number to token to use in error messages
     //     line: usize,
     //     col: usize,
     // },
-    EOF,
+    Eof,
 
     // Identifiers / literals / funcs
-    IDENT(&'a str),
-    LITERAL(Literal<'a>),
-    FUNC(&'a str),
+    Ident(&'a str),
+    Literal(Literal<'a>),
+    Func(&'a str),
 
-    TYPE(&'a str),
+    Type(&'a str),
     
     // Built-in functions
-    BUILT_IN_FUNC(&'a str),
+    built_in_func(&'a str),
 
     // Operators
-    ASSIGN,
-    OPERATOR(Operator),
+    Assign,
+    Operator(ahlang::Operator),
 
     // Delimiters
-    COMMA,
-    SEMICOLON,
-    COLON,
+    Comma,
+    Semicolon,
+    Colon,
 
-    LPAREN,
-    RPAREN,
-    LBRACE,
-    RBRACE,
-    LSQUARE,
-    RSQUARE,
+    LParen,
+    RParen,
+    LBrace,
+    RBrace,
+    LSquare,
+    RSquare,
 
     // Keywords
-    FN,
-    LET,
+    Fn,
+    Let,
+    If,
+    Else,
+    Return,
 }
+
+pub static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
+    "fn" => Token::Fn,
+    "let" => Token::Let,
+    "if" => Token::If,
+    "else" => Token::Else,
+    "return" => Token::Return,
+};
 
 pub struct Lexer<'a> {
     input: &'a str,
@@ -159,11 +154,11 @@ impl<'a> Lexer<'a> {
                 }
 
                 if float {
-                    self.tokens.push(Token::LITERAL(Literal::Float(
+                    self.tokens.push(Token::Literal(Literal::Float(
                         &self.input[i..i + char_count],
                     )));
                 } else {
-                    self.tokens.push(Token::LITERAL(Literal::Int(
+                    self.tokens.push(Token::Literal(Literal::Int(
                         &self.input[i..i + char_count],
                     )));
                 }
@@ -194,64 +189,57 @@ impl<'a> Lexer<'a> {
 
                 let literal = &self.input[i..i + char_count];
 
-                if ahlang::KEYWORDS.contains(&literal) {
-                    match literal {
-                        "fn" => self.tokens.push(Token::FN),
-                        "let" => self.tokens.push(Token::LET),
-                        _ => {
-                            return Err(format!("Unknown keyword: {}", literal));
-                        }
-                    }
-
+                if KEYWORDS.contains_key(&literal) {
+                    self.tokens.push(KEYWORDS[&literal].clone());
                     continue;
                 } else if ahlang::BUILT_IN_TYPES.contains_key(&literal) {
-                    self.tokens.push(Token::TYPE(literal));
+                    self.tokens.push(Token::Type(literal));
                     continue;
                 } else if ahlang::BUILT_IN_FUNCS.contains(&literal) {
-                    self.tokens.push(Token::BUILT_IN_FUNC(literal));
+                    self.tokens.push(Token::built_in_func(literal));
                     continue;
                 } else {
-                    self.tokens.push(Token::IDENT(literal));
+                    self.tokens.push(Token::Ident(literal));
                     continue;
                 }
             }
 
             match current_char {
-                '=' => self.tokens.push(Token::ASSIGN),
+                '=' => self.tokens.push(Token::Assign),
                 '+' => {
                     if self.is_prefix() {
-                        self.tokens.push(Token::OPERATOR(Operator::IDENTITY));
+                        self.tokens.push(Token::Operator(ahlang::Operator::Identity));
                     } else {
-                        self.tokens.push(Token::OPERATOR(Operator::PLUS));
+                        self.tokens.push(Token::Operator(ahlang::Operator::Plus));
                     }
                 },
                 '-' => {
                     if self.is_prefix() {
-                        self.tokens.push(Token::OPERATOR(Operator::NEGATION));
+                        self.tokens.push(Token::Operator(ahlang::Operator::Negation));
                     } else {
-                        self.tokens.push(Token::OPERATOR(Operator::MINUS));
+                        self.tokens.push(Token::Operator(ahlang::Operator::Minus));
                     }
                 }
-                '*' => self.tokens.push(Token::OPERATOR(Operator::ASTERISK)),
-                '/' => self.tokens.push(Token::OPERATOR(Operator::SLASH)),
+                '*' => self.tokens.push(Token::Operator(ahlang::Operator::Asterisk)),
+                '/' => self.tokens.push(Token::Operator(ahlang::Operator::Slash)),
                 '!' => {
-                    self.tokens.push(Token::OPERATOR(Operator::NOT));
+                    self.tokens.push(Token::Operator(ahlang::Operator::Not));
                 }
-                '^' => self.tokens.push(Token::OPERATOR(Operator::CARET)),
-                ',' => self.tokens.push(Token::COMMA),
-                ';' => self.tokens.push(Token::SEMICOLON),
-                ':' => self.tokens.push(Token::COLON),
-                '(' => self.tokens.push(Token::LPAREN),
-                ')' => self.tokens.push(Token::RPAREN),
-                '{' => self.tokens.push(Token::LBRACE),
-                '}' => self.tokens.push(Token::RBRACE),
-                '[' => self.tokens.push(Token::LSQUARE),
-                ']' => self.tokens.push(Token::RSQUARE),
-                _ => self.tokens.push(Token::ILLEGAL),
+                '^' => self.tokens.push(Token::Operator(ahlang::Operator::Caret)),
+                ',' => self.tokens.push(Token::Comma),
+                ';' => self.tokens.push(Token::Semicolon),
+                ':' => self.tokens.push(Token::Colon),
+                '(' => self.tokens.push(Token::LParen),
+                ')' => self.tokens.push(Token::RParen),
+                '{' => self.tokens.push(Token::LBrace),
+                '}' => self.tokens.push(Token::RBrace),
+                '[' => self.tokens.push(Token::LSquare),
+                ']' => self.tokens.push(Token::RSquare),
+                _ => self.tokens.push(Token::Illegal),
             }
         }
 
-        self.tokens.push(Token::EOF);
+        self.tokens.push(Token::Eof);
 
         Ok(&self.tokens)
     }
@@ -261,7 +249,7 @@ impl<'a> Lexer<'a> {
         if last.is_none()
             || !matches!(
                 last.unwrap(),
-                Token::LITERAL(_) | Token::IDENT(_) | Token::RPAREN | Token::RSQUARE | Token::RBRACE | Token::BUILT_IN_FUNC(_) | Token::FUNC(_)
+                Token::Literal(_) | Token::Ident(_) | Token::RParen | Token::RSquare | Token::RBrace | Token::built_in_func(_) | Token::Func(_)
             )
         {
             return true;

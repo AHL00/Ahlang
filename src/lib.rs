@@ -1,10 +1,10 @@
-pub const KEYWORDS: [&str; 2] = ["fn", "let"];
 pub static BUILT_IN_TYPES: phf::Map<&'static str, DataType> = phf::phf_map! {
     "i32" => DataType::Int32,
     "f64" => DataType::Float64,
     "str" => DataType::Str,
     "bool" => DataType::Bool,
 };
+
 pub const BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
 #[derive(Debug, Clone)]
@@ -27,9 +27,27 @@ impl<'a> Data<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 pub enum DataType {
     Int32,
     Float64,
     Str,
     Bool,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum Operator {
+    // Infix operators
+    Plus,
+    Minus,
+    Asterisk,
+    Slash,
+    Caret,
+
+    // Unary operators
+    Not,
+    Identity,
+    Negation,
+}
+

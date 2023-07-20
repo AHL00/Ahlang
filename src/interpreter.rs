@@ -45,9 +45,9 @@ impl<'a> Interpreter<'a> {
     // Recursive for nested statements
     fn eval_statement(&mut self, node: &AstNode<'a>) -> Result<(), String> {
         match node {
-            AstNode::STATEMENT(stmt) => {
+            AstNode::Statement(stmt) => {
                 match stmt {
-                    Statement::LET {identifier, type_, expr} => {
+                    Statement::Let {identifier, type_, expr} => {
                         let res = self.eval_stmt_let(identifier, type_, expr);
                         if res.is_err() {
                             return Err(res.unwrap_err());
@@ -93,16 +93,9 @@ impl<'a> Interpreter<'a> {
 
     fn eval_expression(&mut self, node: &AstNode<'a>) -> Result<Data<'a>, String> {
         // match node {
-        //     AstNode::EXPRESSION(expr) => {
+        //     AstNode::Expression(expr) => {
         //         match expr {
-        //             crate::parser::Expression(expr) => {
-        //                 match expr {
-                            
-        //                     _ => {
-        //                         return Err("Expected expression".to_string());
-        //                     }
-        //                 }
-        //             },
+
         //             _ => {
         //                 return Err("Expected expression".to_string());
         //             }

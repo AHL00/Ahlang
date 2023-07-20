@@ -23,7 +23,7 @@ fn example(y: i32) -> str {
     }
 
     return "Hello, world!";
-}
+};
 ```
 
 ## Roadmap

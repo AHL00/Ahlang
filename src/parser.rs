@@ -39,55 +39,55 @@ impl<'a> Literal<'a> {
 
 #[derive(Debug)]
 pub enum Statement<'a> {
-    LET {
+    Let {
         identifier: &'a str,
         type_: ahlang::DataType,
         expr: Box<AstNode<'a>>,
     },
-    IF,
-    ELSE,
-    RETURN,
+    If,
+    Else,
+    Return,
 }
 
-fn binding_power(operator: &lexer::Operator) -> (u8, u8) {
+fn binding_power(operator: &ahlang::Operator) -> (u8, u8) {
     match operator {
         // infix
-        lexer::Operator::PLUS | lexer::Operator::MINUS => (3, 4),
-        lexer::Operator::ASTERISK | lexer::Operator::SLASH => (5, 6),
-        lexer::Operator::CARET => (7, 8),
+        ahlang::Operator::Plus | ahlang::Operator::Minus => (3, 4),
+        ahlang::Operator::Asterisk | ahlang::Operator::Slash => (5, 6),
+        ahlang::Operator::Caret => (7, 8),
 
         // prefix
-        lexer::Operator::NOT => (0, 7),
-        lexer::Operator::IDENTITY => (0, 7),
-        lexer::Operator::NEGATION => (0, 7),
+        ahlang::Operator::Not => (0, 7),
+        ahlang::Operator::Identity => (0, 7),
+        ahlang::Operator::Negation => (0, 7),
     }
 }
 
-fn is_prefix_operator(operator: &lexer::Operator) -> bool {
+fn is_prefix_operator(operator: &ahlang::Operator) -> bool {
     match operator {
-        lexer::Operator::NOT | lexer::Operator::IDENTITY | lexer::Operator::NEGATION => true,
+        ahlang::Operator::Not | ahlang::Operator::Identity | ahlang::Operator::Negation => true,
         _ => false,
     }
 }
 
 #[derive(Debug)]
 pub enum Expression<'a> {
-    IDENTIFIER(&'a str),
-    LITERAL(Literal<'a>),
-    PREFIX {
-        operator: lexer::Operator,
+    Identifier(&'a str),
+    Literal(Literal<'a>),
+    Prefix {
+        operator: ahlang::Operator,
         right: Box<AstNode<'a>>,
     },
-    POSTFIX {
+    Postfix {
         left: Box<AstNode<'a>>,
-        operator: lexer::Operator,
+        operator: ahlang::Operator,
     },
-    INFIX {
+    Infix {
         left: Box<AstNode<'a>>,
-        operator: lexer::Operator,
+        operator: ahlang::Operator,
         right: Box<AstNode<'a>>,
     },
-    CALL {
+    Call {
         function: &'a str,
         arguments: Vec<AstNode<'a>>,
     },
@@ -95,9 +95,9 @@ pub enum Expression<'a> {
 
 #[derive(Debug)]
 pub enum AstNode<'a> {
-    EXPRESSION(Expression<'a>),
+    Expression(Expression<'a>),
 
-    STATEMENT(Statement<'a>),
+    Statement(Statement<'a>),
 }
 
 #[derive(Debug)]
@@ -112,30 +112,30 @@ impl<'a> Ast<'a> {
 
     fn print_recursive(&self, node: &AstNode, indent: String, is_last: bool) {
         match node {
-            AstNode::EXPRESSION(expr) => match expr {
-                Expression::IDENTIFIER(identifier) => println!("{}IDENTIFIER({})", &indent, identifier),
-                Expression::LITERAL(literal) => {
+            AstNode::Expression(expr) => match expr {
+                Expression::Identifier(identifier) => println!("{}IDENTIFIER({})", &indent, identifier),
+                Expression::Literal(literal) => {
                     println!("{}LITERAL", &indent);
                     println!("{}├── type: {:?}", &indent, literal.type_);
                     println!("{}└── data: {:?}", &indent, literal.data);
                 },
-                Expression::PREFIX { operator, right } => {
+                Expression::Prefix { operator, right } => {
                     println!("{}PREFIX", &indent);
                     println!("{}├── op: {:?}", &indent, operator);
                     self.print_recursive(right, format!("{}│   ", &indent), true);
                 }
-                Expression::POSTFIX { left, operator } => {
+                Expression::Postfix { left, operator } => {
                     println!("{}POSTFIX", &indent);
                     self.print_recursive(left, format!("{}├── ", &indent), false);
                     println!("{}└── op: {:?}", &indent, operator);
                 }
-                Expression::INFIX { left, operator, right } => {
+                Expression::Infix { left, operator, right } => {
                     println!("{}INFIX", &indent);
                     self.print_recursive(left, format!("{}├── ", &indent), false);
                     println!("{}├── op: {:?}", &indent, operator);
                     self.print_recursive(right, format!("{}│   ", &indent), true);
                 }
-                Expression::CALL { function, arguments } => {
+                Expression::Call { function, arguments } => {
                     println!("{}CALL", &indent);
                     println!("{}├── function: {}", &indent, function);
                     for (i, arg) in arguments.iter().enumerate() {
@@ -148,8 +148,8 @@ impl<'a> Ast<'a> {
                     }
                 }
             },
-            AstNode::STATEMENT(stmt) => match stmt {
-                Statement::LET {
+            AstNode::Statement(stmt) => match stmt {
+                Statement::Let {
                     identifier,
                     type_,
                     expr: value,
@@ -164,9 +164,9 @@ impl<'a> Ast<'a> {
                     println!("{}├── type: {:?}", &current_indent, type_);
                     self.print_recursive(value, format!("{}└── ", &current_indent), true);
                 }
-                Statement::IF => println!("{}IF", &indent),
-                Statement::ELSE => println!("{}ELSE", &indent),
-                Statement::RETURN => println!("{}RETURN", &indent),
+                Statement::If => println!("{}IF", &indent),
+                Statement::Else => println!("{}ELSE", &indent),
+                Statement::Return => println!("{}RETURN", &indent),
             },
         }
     }
@@ -225,8 +225,8 @@ impl<'a> Parser<'a> {
     fn parse_token(&mut self) -> Result<(), String> {
         // Used for both main and block statements
         let parse_res = match self.tokens[self.current_token] {
-            lexer::Token::LET => self.parse_let(),
-            lexer::Token::EOF => Ok(()),
+            lexer::Token::Let => self.parse_let(),
+            lexer::Token::Eof => Ok(()),
             _ => Err(format!(
                 "[E001] Unexpected token: {:?}",
                 self.tokens[self.current_token]
@@ -240,7 +240,7 @@ impl<'a> Parser<'a> {
         let mut block: Vec<AstNode<'a>> = Vec::new();
 
         // iterate until we find a closing brace
-        while self.tokens[self.current_token] != lexer::Token::RBRACE {
+        while self.tokens[self.current_token] != lexer::Token::RBrace {
             let res = self.parse_token();
 
             if res.is_err() {
@@ -258,7 +258,7 @@ impl<'a> Parser<'a> {
     /// Current token should be the token before the first token of the expression
     fn parse_expr(
         &mut self,
-        end_token: Token<'a>,
+        end_token: &Token<'a>,
         mut min_bp: Option<u8>,
     ) -> Result<Box<AstNode<'a>>, String> {
         // Current token is the first token of the expression
@@ -266,39 +266,39 @@ impl<'a> Parser<'a> {
         let mut lhs: Box<AstNode<'a>>;
 
         match self.tokens[self.current_token] {
-            Token::OPERATOR(op) => {
+            Token::Operator(op) => {
                 // starts with an operator, so it's a prefix expression
                 if is_prefix_operator(&op) {
                     let r_bp = binding_power(&op).1;
                     let right = self.parse_expr(end_token, Some(r_bp))?;
-                    lhs = Box::new(AstNode::EXPRESSION(Expression::PREFIX { operator: op, right }));
+                    lhs = Box::new(AstNode::Expression(Expression::Prefix { operator: op, right }));
                 } else {
                     return Err("[Esmth] Expected prefix operator".to_string());
                 }
             }
             _ => {
                 lhs = match self.tokens[self.current_token] {
-                    lexer::Token::IDENT(ident) => {
-                        Box::new(AstNode::EXPRESSION(Expression::IDENTIFIER(ident)))
+                    lexer::Token::Ident(ident) => {
+                        Box::new(AstNode::Expression(Expression::Identifier(ident)))
                     }
-                    lexer::Token::LITERAL(lit) => {
+                    lexer::Token::Literal(lit) => {
                         use lexer::Literal as LexerLiteral;
 
                         match lit {
                             LexerLiteral::Int(data) => {
                                 let mut literal = Literal::new(ahlang::DataType::Int32);
                                 literal.set_data_from_str(data);
-                                Box::new(AstNode::EXPRESSION(Expression::LITERAL(literal)))
+                                Box::new(AstNode::Expression(Expression::Literal(literal)))
                             },
                             LexerLiteral::Float(data) => {
                                 let mut literal = Literal::new(ahlang::DataType::Float64);
                                 literal.set_data_from_str(data);
-                                Box::new(AstNode::EXPRESSION(Expression::LITERAL(literal)))
+                                Box::new(AstNode::Expression(Expression::Literal(literal)))
                             },
                         }
                     },
-                    lexer::Token::LPAREN => {
-                        let expr = self.parse_expr(lexer::Token::RPAREN, None)?;
+                    lexer::Token::LParen => {
+                        let expr = self.parse_expr(&lexer::Token::RParen, None)?;
                         self.current_token += 1;
                         expr
                     }
@@ -320,12 +320,12 @@ impl<'a> Parser<'a> {
             // every time we exit a recursive call, we arrive here.
             // when parsing is done every layer of recursion will
             // arrive at the end_token and break their loops
-            let op = match *self.peek() {
-                lexer::Token::OPERATOR(op) => op,
+            let op = match self.peek().clone() {
+                lexer::Token::Operator(op) => op,
                 token => {
-                    if token == end_token {
+                    if token == *end_token {
                         break;
-                    } else if token == lexer::Token::EOF {
+                    } else if token == lexer::Token::Eof {
                         return Err("[Esmth] Unexpected EOF".to_string());
                     }
                     return Err("[Esmth] Expected operator".to_string());
@@ -348,7 +348,7 @@ impl<'a> Parser<'a> {
 
             let right = right.unwrap();
 
-            lhs = Box::new(AstNode::EXPRESSION(Expression::INFIX {
+            lhs = Box::new(AstNode::Expression(Expression::Infix {
                 left: lhs,
                 operator: op,
                 right,
@@ -365,7 +365,7 @@ impl<'a> Parser<'a> {
         // next token should be identifier
         self.current_token += 1;
         let ident: &str = match self.tokens[self.current_token] {
-            lexer::Token::IDENT(ident) => ident,
+            lexer::Token::Ident(ident) => ident,
             _ => {
                 return Err("[E011] Expected identifier after let".to_string());
             }
@@ -375,14 +375,14 @@ impl<'a> Parser<'a> {
         self.current_token += 1;
         let type_: ahlang::DataType;
 
-        if self.tokens[self.current_token] == lexer::Token::COLON {
+        if self.tokens[self.current_token] == lexer::Token::Colon {
             self.current_token += 1;
             type_ = match self.tokens[self.current_token] {
-                lexer::Token::IDENT(type_) => {
+                lexer::Token::Ident(type_) => {
                     todo!("Custom types are not yet supported");
                     // TODO: check if type exists
                 },
-                lexer::Token::TYPE(type_) => {
+                lexer::Token::Type(type_) => {
                     if ahlang::BUILT_IN_TYPES.contains_key(type_) {
                         ahlang::BUILT_IN_TYPES.get(type_).unwrap().clone()
                     } else {
@@ -400,7 +400,7 @@ impl<'a> Parser<'a> {
 
         // Next token is equals
         self.current_token += 1;
-        if self.tokens[self.current_token] != lexer::Token::ASSIGN {
+        if self.tokens[self.current_token] != lexer::Token::Assign {
             return Err("[E014] Expected assign operator after type".to_string());
         }
 
@@ -412,7 +412,7 @@ impl<'a> Parser<'a> {
 
         let expr: Box<AstNode<'a>>;
 
-        let res = self.parse_expr(lexer::Token::SEMICOLON, None);
+        let res = self.parse_expr(&lexer::Token::Semicolon, None);
         if res.is_err() {
             return Err(res.unwrap_err());
         } else {
@@ -421,7 +421,7 @@ impl<'a> Parser<'a> {
 
         // Next token is semicolon
         self.current_token += 1;
-        if self.tokens[self.current_token] != lexer::Token::SEMICOLON {
+        if self.tokens[self.current_token] != lexer::Token::Semicolon {
             return Err("[E015] Expected semicolon after expression".to_string());
         }
 
@@ -431,7 +431,7 @@ impl<'a> Parser<'a> {
         let type_ =
 
         // Add let statement to ast
-        self.ast.root.push(AstNode::STATEMENT(Statement::LET {
+        self.ast.root.push(AstNode::Statement(Statement::Let {
             identifier: ident,
             type_: type_,
             expr,

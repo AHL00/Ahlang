@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq, Clone, Copy)]
-pub enum LexerLiteral<'a> {
-    INT(&'a str),
-    FLOAT(&'a str),
+pub enum Literal<'a> {
+    Int(&'a str),
+    Float(&'a str),
 }
 
 // TODO: Move to operator.rs maybe lib.rs
@@ -31,11 +31,12 @@ pub enum Token<'a> {
 
     // Identifiers / literals / funcs
     IDENT(&'a str),
-    LITERAL(LexerLiteral<'a>),
+    LITERAL(Literal<'a>),
     FUNC(&'a str),
 
+    TYPE(&'a str),
+    
     // Built-in functions
-    BUILT_IN_TYPE(&'a str),
     BUILT_IN_FUNC(&'a str),
 
     // Operators
@@ -58,10 +59,6 @@ pub enum Token<'a> {
     FN,
     LET,
 }
-
-static KEYWORDS: [&str; 2] = ["fn", "let"];
-static BUILT_IN_TYPES: [&str; 2] = ["int", "float"];
-static BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
 pub struct Lexer<'a> {
     input: &'a str,
@@ -96,6 +93,29 @@ impl<'a> Lexer<'a> {
 
             if current_char.is_whitespace() {
                 continue;
+            }
+
+            if current_char == '/' {
+                let peek = char_iter.peek();
+                if peek.is_none() {
+                    return Err("Unexpected EOF".to_string());
+                }
+                if peek.unwrap().1 == '/' {
+                    // skip comment
+                    let mut next_char = char_iter.next();
+
+                    while next_char.is_some() {
+                        let (i, c) = next_char.unwrap();
+
+                        if c == '\n' {
+                            break;
+                        }
+
+                        next_char = char_iter.next();
+                    }
+
+                    continue;
+                }
             }
 
             if current_char.is_digit(10) {
@@ -139,11 +159,11 @@ impl<'a> Lexer<'a> {
                 }
 
                 if float {
-                    self.tokens.push(Token::LITERAL(LexerLiteral::FLOAT(
+                    self.tokens.push(Token::LITERAL(Literal::Float(
                         &self.input[i..i + char_count],
                     )));
                 } else {
-                    self.tokens.push(Token::LITERAL(LexerLiteral::INT(
+                    self.tokens.push(Token::LITERAL(Literal::Int(
                         &self.input[i..i + char_count],
                     )));
                 }
@@ -174,7 +194,7 @@ impl<'a> Lexer<'a> {
 
                 let literal = &self.input[i..i + char_count];
 
-                if KEYWORDS.contains(&literal) {
+                if ahlang::KEYWORDS.contains(&literal) {
                     match literal {
                         "fn" => self.tokens.push(Token::FN),
                         "let" => self.tokens.push(Token::LET),
@@ -184,10 +204,10 @@ impl<'a> Lexer<'a> {
                     }
 
                     continue;
-                } else if BUILT_IN_TYPES.contains(&literal) {
-                    self.tokens.push(Token::BUILT_IN_TYPE(literal));
+                } else if ahlang::BUILT_IN_TYPES.contains_key(&literal) {
+                    self.tokens.push(Token::TYPE(literal));
                     continue;
-                } else if BUILT_IN_FUNCS.contains(&literal) {
+                } else if ahlang::BUILT_IN_FUNCS.contains(&literal) {
                     self.tokens.push(Token::BUILT_IN_FUNC(literal));
                     continue;
                 } else {
@@ -241,7 +261,7 @@ impl<'a> Lexer<'a> {
         if last.is_none()
             || !matches!(
                 last.unwrap(),
-                Token::LITERAL(_) | Token::IDENT(_) | Token::RPAREN | Token::RSQUARE | Token::RBRACE | Token::BUILT_IN_FUNC(_) | Token::FUNC(_) | Token::LPAREN | Token::LSQUARE | Token::LBRACE
+                Token::LITERAL(_) | Token::IDENT(_) | Token::RPAREN | Token::RSQUARE | Token::RBRACE | Token::BUILT_IN_FUNC(_) | Token::FUNC(_)
             )
         {
             return true;

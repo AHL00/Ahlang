@@ -1,22 +1,48 @@
-use std::collections::HashMap;
-
 use crate::lexer::{self, Token};
 
+// TODO: Proper errors and code cleanup
+
 #[derive(Debug)]
-pub enum Literal<'a> {
-    INT(i32),
-    FLOAT(f64),
-    STRING(&'a str),
-    BOOL(bool),
+pub struct Literal<'a> {
+    data: Option<ahlang::Data<'a>>,
+    type_: ahlang::DataType,
+}
+
+impl<'a> Literal<'a> {
+    pub fn new(type_: ahlang::DataType) -> Literal<'a> {
+        Literal { data: None, type_ }
+    }
+
+    pub fn set_data_from_str(&mut self, data_str: &'a str) {
+        match self.type_ {
+            ahlang::DataType::Int32 => {
+                self.data = Some(ahlang::Data::Int32(
+                    data_str.parse::<i32>().expect("Failed to parse int"),
+                ));
+            }
+            ahlang::DataType::Float64 => {
+                self.data = Some(ahlang::Data::Float64(
+                    data_str.parse::<f64>().expect("Failed to parse float"),
+                ));
+            }
+            ahlang::DataType::Str => {
+                self.data = Some(ahlang::Data::Str(data_str));
+            }
+            ahlang::DataType::Bool => {
+                self.data = Some(ahlang::Data::Bool(
+                    data_str.parse::<bool>().expect("Failed to parse bool"),
+                ));
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum Statement<'a> {
     LET {
         identifier: &'a str,
-        type_: &'a str,
-        built_in_type: bool,
-        value: Box<AstNode<'a>>,
+        type_: ahlang::DataType,
+        expr: Box<AstNode<'a>>,
     },
     IF,
     ELSE,
@@ -82,6 +108,78 @@ pub struct Ast<'a> {
 impl<'a> Ast<'a> {
     fn new(tokens: &'a Vec<lexer::Token<'a>>) -> Ast<'a> {
         Ast { root: Vec::new() }
+    }
+
+    fn print_recursive(&self, node: &AstNode, indent: String, is_last: bool) {
+        match node {
+            AstNode::EXPRESSION(expr) => match expr {
+                Expression::IDENTIFIER(identifier) => println!("{}IDENTIFIER({})", &indent, identifier),
+                Expression::LITERAL(literal) => {
+                    println!("{}LITERAL", &indent);
+                    println!("{}├── type: {:?}", &indent, literal.type_);
+                    println!("{}└── data: {:?}", &indent, literal.data);
+                },
+                Expression::PREFIX { operator, right } => {
+                    println!("{}PREFIX", &indent);
+                    println!("{}├── op: {:?}", &indent, operator);
+                    self.print_recursive(right, format!("{}│   ", &indent), true);
+                }
+                Expression::POSTFIX { left, operator } => {
+                    println!("{}POSTFIX", &indent);
+                    self.print_recursive(left, format!("{}├── ", &indent), false);
+                    println!("{}└── op: {:?}", &indent, operator);
+                }
+                Expression::INFIX { left, operator, right } => {
+                    println!("{}INFIX", &indent);
+                    self.print_recursive(left, format!("{}├── ", &indent), false);
+                    println!("{}├── op: {:?}", &indent, operator);
+                    self.print_recursive(right, format!("{}│   ", &indent), true);
+                }
+                Expression::CALL { function, arguments } => {
+                    println!("{}CALL", &indent);
+                    println!("{}├── function: {}", &indent, function);
+                    for (i, arg) in arguments.iter().enumerate() {
+                        let is_last_arg = i == arguments.len() - 1;
+                        if is_last_arg {
+                            self.print_recursive(arg, format!("{}└── ", &indent), true);
+                        } else {
+                            self.print_recursive(arg, format!("{}│   ", &indent), false);
+                        }
+                    }
+                }
+            },
+            AstNode::STATEMENT(stmt) => match stmt {
+                Statement::LET {
+                    identifier,
+                    type_,
+                    expr: value,
+                } => {
+                    let current_indent = if is_last {
+                        indent
+                    } else {
+                        format!("{}", &indent)
+                    };
+                    println!("{}LET", &current_indent);
+                    println!("{}├── identifier: {}", &current_indent, identifier);
+                    println!("{}├── type: {:?}", &current_indent, type_);
+                    self.print_recursive(value, format!("{}└── ", &current_indent), true);
+                }
+                Statement::IF => println!("{}IF", &indent),
+                Statement::ELSE => println!("{}ELSE", &indent),
+                Statement::RETURN => println!("{}RETURN", &indent),
+            },
+        }
+    }
+    
+}
+
+impl<'a> std::fmt::Display for Ast<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for node in &self.root {
+            self.print_recursive(node, String::from(""), false);
+        }
+
+        Ok(())
     }
 }
 
@@ -183,9 +281,22 @@ impl<'a> Parser<'a> {
                     lexer::Token::IDENT(ident) => {
                         Box::new(AstNode::EXPRESSION(Expression::IDENTIFIER(ident)))
                     }
-                    lexer::Token::LITERAL(lit) => Box::new(AstNode::EXPRESSION(Expression::LITERAL(
-                        Self::lexer_to_ast_literal(lit),
-                    ))),
+                    lexer::Token::LITERAL(lit) => {
+                        use lexer::Literal as LexerLiteral;
+
+                        match lit {
+                            LexerLiteral::Int(data) => {
+                                let mut literal = Literal::new(ahlang::DataType::Int32);
+                                literal.set_data_from_str(data);
+                                Box::new(AstNode::EXPRESSION(Expression::LITERAL(literal)))
+                            },
+                            LexerLiteral::Float(data) => {
+                                let mut literal = Literal::new(ahlang::DataType::Float64);
+                                literal.set_data_from_str(data);
+                                Box::new(AstNode::EXPRESSION(Expression::LITERAL(literal)))
+                            },
+                        }
+                    },
                     lexer::Token::LPAREN => {
                         let expr = self.parse_expr(lexer::Token::RPAREN, None)?;
                         self.current_token += 1;
@@ -247,19 +358,6 @@ impl<'a> Parser<'a> {
         return Ok(lhs);
     }
 
-    fn lexer_to_ast_literal(literal: lexer::LexerLiteral<'a>) -> Literal<'a> {
-        match literal {
-            lexer::LexerLiteral::INT(int) => {
-                let int = int.replace("_", "");
-                Literal::INT(int.parse::<i32>().expect("Failed to parse int"))
-            }
-            lexer::LexerLiteral::FLOAT(float) => {
-                let float = float.replace("_", "");
-                Literal::FLOAT(float.parse::<f64>().expect("Failed to parse float"))
-            }
-        }
-    }
-
     fn parse_let(&mut self) -> Result<(), String> {
         // start with let
         // do nothing and move on
@@ -275,16 +373,21 @@ impl<'a> Parser<'a> {
 
         // Next token is colon, parse type
         self.current_token += 1;
-        let type_: &str;
-        let mut built_in_type: bool = false;
+        let type_: ahlang::DataType;
 
         if self.tokens[self.current_token] == lexer::Token::COLON {
             self.current_token += 1;
             type_ = match self.tokens[self.current_token] {
-                lexer::Token::IDENT(type_) => type_,
-                lexer::Token::BUILT_IN_TYPE(type_) => {
-                    built_in_type = true;
-                    type_
+                lexer::Token::IDENT(type_) => {
+                    todo!("Custom types are not yet supported");
+                    // TODO: check if type exists
+                },
+                lexer::Token::TYPE(type_) => {
+                    if ahlang::BUILT_IN_TYPES.contains_key(type_) {
+                        ahlang::BUILT_IN_TYPES.get(type_).unwrap().clone()
+                    } else {
+                        return Err(format!("[E016] Unknown type: {}", type_));
+                    }
                 }
                 _ => {
                     return Err("[E012] Expected type after colon".to_string());
@@ -314,7 +417,6 @@ impl<'a> Parser<'a> {
             return Err(res.unwrap_err());
         } else {
             expr = res.unwrap();
-            println!("{:?}", expr);
         }
 
         // Next token is semicolon
@@ -323,12 +425,16 @@ impl<'a> Parser<'a> {
             return Err("[E015] Expected semicolon after expression".to_string());
         }
 
+        // match to phf hashmap ahlang::BUILT_IN_TYPES
+        // if not found, it's a user defined type
+        // if found, it's a built in type
+        let type_ =
+
         // Add let statement to ast
         self.ast.root.push(AstNode::STATEMENT(Statement::LET {
             identifier: ident,
             type_: type_,
-            built_in_type: built_in_type,
-            value: expr,
+            expr,
         }));
 
         Ok(())

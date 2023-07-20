@@ -1,36 +1,41 @@
-// built in type
+## Built in types
 - string
 - int
 - float
 - bool
-- char
 - tuple
 - array
 - vector
 
 
-// function
+### Function
+```
 fn main() -> () {
 
 }
+```
 
-// variable
+### Variable
+```
 let x: int = 5;
+```
 
-// constant
+### Constant
+```
 const y: int = 5;
+```
 
-// struct
+## Struct
+```
 struct Point {
     x: int,
     y: int,
-}
 
-impl Point {
-    fn new(x: int, y: int) -> Point {
-        Point { x: x, y: y }
-    }
+    Point();
+    ~Point();
+    
 }
+```
 
 // enum
 enum Direction {

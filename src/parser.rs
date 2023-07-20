@@ -3,16 +3,18 @@ use crate::lexer::{self, Token};
 // TODO: Proper errors and code cleanup
 
 #[derive(Debug)]
-pub struct Literal<'a> {
-    pub data: Option<ahlang::Data<'a>>,
+pub struct Literal {
+    pub data: Option<ahlang::Data>,
     pub type_: ahlang::DataType,
 }
 
-impl<'a> Literal<'a> {
-    pub fn new(type_: ahlang::DataType) -> Literal<'a> {
+impl Literal {
+    pub fn new(type_: ahlang::DataType) -> Literal {
         Literal { data: None, type_ }
     }
+}
 
+impl<'a> Literal {
     pub fn set_data_from_str(&mut self, data_str: &'a str) {
         match self.type_ {
             ahlang::DataType::Int32 => {
@@ -26,7 +28,7 @@ impl<'a> Literal<'a> {
                 ));
             }
             ahlang::DataType::Str => {
-                self.data = Some(ahlang::Data::Str(data_str));
+                self.data = Some(ahlang::Data::Str(data_str.to_owned()));
             }
             ahlang::DataType::Bool => {
                 self.data = Some(ahlang::Data::Bool(
@@ -38,11 +40,11 @@ impl<'a> Literal<'a> {
 }
 
 #[derive(Debug)]
-pub enum Statement<'a> {
+pub enum Statement {
     Let {
-        identifier: &'a str,
+        identifier: String,
         type_: ahlang::DataType,
-        expr: Box<AstNode<'a>>,
+        expr: Box<AstNode>,
     },
     If,
     Else,
@@ -71,42 +73,43 @@ fn is_prefix_operator(operator: &ahlang::Operator) -> bool {
 }
 
 #[derive(Debug)]
-pub enum Expression<'a> {
-    Identifier(&'a str),
-    Literal(Literal<'a>),
+pub enum Expression {
+    Identifier(String),
+    Literal(Literal),
     Prefix {
         operator: ahlang::Operator,
-        right: Box<AstNode<'a>>,
+        right: Box<AstNode>,
     },
     Postfix {
-        left: Box<AstNode<'a>>,
+        left: Box<AstNode>,
         operator: ahlang::Operator,
     },
     Infix {
-        left: Box<AstNode<'a>>,
+        left: Box<AstNode>,
         operator: ahlang::Operator,
-        right: Box<AstNode<'a>>,
+        right: Box<AstNode>,
     },
     Call {
-        function: &'a str,
-        arguments: Vec<AstNode<'a>>,
+        // TODO: Optimization: Lexer immediately registers functions, replace string with function "pointer"
+        function: String,
+        arguments: Vec<AstNode>,
     },
 }
 
 #[derive(Debug)]
-pub enum AstNode<'a> {
-    Expression(Expression<'a>),
+pub enum AstNode {
+    Expression(Expression),
 
-    Statement(Statement<'a>),
+    Statement(Statement),
 }
 
 #[derive(Debug)]
-pub struct Ast<'a> {
-    pub root: Vec<AstNode<'a>>,
+pub struct Ast {
+    pub root: Vec<AstNode>,
 }
 
-impl<'a> Ast<'a> {
-    fn new(tokens: &'a Vec<lexer::Token<'a>>) -> Ast<'a> {
+impl Ast {
+    fn new(tokens: &Vec<lexer::Token>) -> Ast {
         Ast { root: Vec::new() }
     }
 
@@ -173,7 +176,7 @@ impl<'a> Ast<'a> {
     
 }
 
-impl<'a> std::fmt::Display for Ast<'a> {
+impl std::fmt::Display for Ast {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for node in &self.root {
             self.print_recursive(node, String::from(""), false);
@@ -185,7 +188,7 @@ impl<'a> std::fmt::Display for Ast<'a> {
 
 pub struct Parser<'a> {
     tokens: &'a Vec<lexer::Token<'a>>,
-    ast: Ast<'a>,
+    ast: Ast,
     current_token: usize,
 }
 
@@ -198,11 +201,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn get_ast(&self) -> &Ast<'a> {
+    pub fn get_ast(&self) -> &Ast {
         &self.ast
     }
 
-    pub fn parse(&mut self) -> Result<&Ast<'a>, String> {
+    pub fn parse(&mut self) -> Result<&Ast, String> {
         while self.current_token < self.tokens.len() {
             let res = self.parse_token();
 
@@ -237,7 +240,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_block(&mut self) -> Result<(), String> {
-        let mut block: Vec<AstNode<'a>> = Vec::new();
+        let mut block: Vec<AstNode> = Vec::new();
 
         // iterate until we find a closing brace
         while self.tokens[self.current_token] != lexer::Token::RBrace {
@@ -260,10 +263,10 @@ impl<'a> Parser<'a> {
         &mut self,
         end_token: &Token<'a>,
         mut min_bp: Option<u8>,
-    ) -> Result<Box<AstNode<'a>>, String> {
+    ) -> Result<Box<AstNode>, String> {
         // Current token is the first token of the expression
         self.current_token += 1;
-        let mut lhs: Box<AstNode<'a>>;
+        let mut lhs: Box<AstNode>;
 
         match self.tokens[self.current_token] {
             Token::Operator(op) => {
@@ -279,7 +282,7 @@ impl<'a> Parser<'a> {
             _ => {
                 lhs = match self.tokens[self.current_token] {
                     lexer::Token::Ident(ident) => {
-                        Box::new(AstNode::Expression(Expression::Identifier(ident)))
+                        Box::new(AstNode::Expression(Expression::Identifier(ident.to_owned())))
                     }
                     lexer::Token::Literal(lit) => {
                         use lexer::Literal as LexerLiteral;
@@ -404,7 +407,7 @@ impl<'a> Parser<'a> {
             return Err("[E014] Expected assign operator after type".to_string());
         }
 
-        let expr: Box<AstNode<'a>>;
+        let expr: Box<AstNode>;
 
         let res = self.parse_expr(&lexer::Token::Semicolon, None);
         if res.is_err() {
@@ -421,7 +424,7 @@ impl<'a> Parser<'a> {
 
         // Add let statement to ast
         self.ast.root.push(AstNode::Statement(Statement::Let {
-            identifier: ident,
+            identifier: ident.to_owned(),
             type_: type_,
             expr,
         }));

@@ -8,14 +8,14 @@ pub static BUILT_IN_TYPES: phf::Map<&'static str, DataType> = phf::phf_map! {
 pub const BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
 #[derive(Debug, Clone)]
-pub enum Data<'a> {
+pub enum Data {
     Int32(i32),
     Float64(f64),
-    Str(&'a str),
+    Str(String),
     Bool(bool),
 }
 
-impl<'a> Data<'a> {
+impl Data {
     pub fn get_type(&self) -> DataType {
         match self {
             Data::Int32(_) => DataType::Int32,

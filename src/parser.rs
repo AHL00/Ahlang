@@ -4,8 +4,8 @@ use crate::lexer::{self, Token};
 
 #[derive(Debug)]
 pub struct Literal<'a> {
-    data: Option<ahlang::Data<'a>>,
-    type_: ahlang::DataType,
+    pub data: Option<ahlang::Data<'a>>,
+    pub type_: ahlang::DataType,
 }
 
 impl<'a> Literal<'a> {
@@ -404,12 +404,6 @@ impl<'a> Parser<'a> {
             return Err("[E014] Expected assign operator after type".to_string());
         }
 
-        // Possible expressions:
-        // let x: int = 1; <- literal
-        // let x: int = y; <- identifier
-        // let x: int = 1 + 2; <- binary expression
-        // let x: int; <- uninitialized variable
-
         let expr: Box<AstNode<'a>>;
 
         let res = self.parse_expr(&lexer::Token::Semicolon, None);
@@ -424,11 +418,6 @@ impl<'a> Parser<'a> {
         if self.tokens[self.current_token] != lexer::Token::Semicolon {
             return Err("[E015] Expected semicolon after expression".to_string());
         }
-
-        // match to phf hashmap ahlang::BUILT_IN_TYPES
-        // if not found, it's a user defined type
-        // if found, it's a built in type
-        let type_ =
 
         // Add let statement to ast
         self.ast.root.push(AstNode::Statement(Statement::Let {

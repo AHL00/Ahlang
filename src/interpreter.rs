@@ -2,7 +2,7 @@ use std::{any::Any, collections::HashMap};
 
 use ahlang::Data;
 
-use crate::parser::{AstNode, Statement};
+use crate::parser::{AstNode, Statement, Expression};
 
 pub struct Interpreter<'a> {
     ast: &'a crate::parser::Ast<'a>,   
@@ -43,7 +43,7 @@ impl<'a> Interpreter<'a> {
     }
 
     // Recursive for nested statements
-    fn eval_statement(&mut self, node: &AstNode<'a>) -> Result<(), String> {
+    fn eval_statement(&mut self, node: &'a AstNode<'a>) -> Result<(), String> {
         match node {
             AstNode::Statement(stmt) => {
                 match stmt {
@@ -67,13 +67,20 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn eval_stmt_let(&mut self, identifier: &&'a str, type_: &ahlang::DataType, expr: &Box<AstNode<'a>>) -> Result<(), String> {
+    fn eval_stmt_let(&mut self, identifier: &&'a str, type_: &ahlang::DataType, expr: &'a Box<AstNode<'a>>) -> Result<(), String> {
         println!("Evaluating LET statement");
         let data: Data<'a>;
 
         // evaluate expression
-        let res = self.eval_expression(expr);
-        
+        let res = match expr.as_ref() {
+            AstNode::Expression(expr) => {
+                self.eval_expression(expr)
+            },
+            _ => {
+                return Err("Expected expression".to_string());
+            }
+        };
+    
         if res.is_err() {
             return Err(res.unwrap_err());
         } else {
@@ -91,24 +98,32 @@ impl<'a> Interpreter<'a> {
         Ok(())
     }
 
-    fn eval_expression(&mut self, node: &AstNode<'a>) -> Result<Data<'a>, String> {
-        // match node {
-        //     AstNode::Expression(expr) => {
-        //         match expr {
+    // Recursive for nested expressions
+    fn eval_expression(&mut self, expr: &'a Expression) -> Result<Data<'a>, String> {
+        match *expr {
+            Expression::Literal(_) => {
+                return self.eval_literal(expr);
+            },
+            _ => {
+                return Err("Expression type not implemented yet".to_string());
+            }
+        };
+    }
 
-        //             _ => {
-        //                 return Err("Expected expression".to_string());
-        //             }
-        //         }
-        //     },
-        //     _ => {
-        //         return Err("Expected expression".to_string());
-        //     }
-        // }
-
-        // Ok(Box::new(()))
-        let data = Data::Int32(12);
-        Ok(data)
+    fn eval_literal(&mut self, literal: &'a Expression) -> Result<Data<'a>, String> {
+        match literal {
+            Expression::Literal(literal) => {
+                if literal.data.is_none() {
+                    return Err("Literal has no data".to_string());
+                } else {
+                    let data = literal.data.as_ref().unwrap();
+                    return Ok(data.clone())
+                }
+            },
+            _ => {
+                Err("Expected literal".to_string())
+            }
+        }
     }
 
 }

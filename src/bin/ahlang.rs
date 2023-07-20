@@ -32,7 +32,7 @@ fn main() {
     l.set_input(file);
 
     let res = l.tokenize();
-    let tokens: lexer::Tokens;
+    let tokens: &lexer::Tokens;
     
     if res.is_err() {
         println!("Error: {}", res.unwrap_err());
@@ -62,8 +62,6 @@ fn main() {
 
 fn repl() {
     use std::io::Write;
-    
-    let mut repl_engine = ReplEngine::new();
 
     println!("Ahlang REPL v{}", env!("CARGO_PKG_VERSION"));
     println!("Type 'exit' to exit, 'help' for more information");
@@ -84,12 +82,12 @@ fn repl() {
             continue;
         }
 
-        let res = repl_engine.eval(input);
+        //let res = repl_engine.eval(input);
 
-        if res.is_err() {
-            println!("{}", res.unwrap_err());
-            continue;
-        }
+        // if res.is_err() {
+        //     println!("{}", res.unwrap_err());
+        //     continue;
+        // }
 
     }
 }

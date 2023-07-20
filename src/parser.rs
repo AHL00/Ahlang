@@ -201,22 +201,22 @@ impl std::fmt::Display for Ast {
 
 static EMPTY_TOKENS: lexer::Tokens = lexer::Tokens { vec: Vec::new() };
 
-pub struct Parser {
+pub struct Parser<'a> {
     ast: Ast,
-    tokens: lexer::Tokens,
+    tokens: &'a lexer::Tokens,
     current_token: usize,
 }
 
-impl Parser {
-    pub fn new() -> Parser {
+impl<'a> Parser<'a> {
+    pub fn new() -> Parser<'a> {
         Parser {
             ast: Ast::new(),
-            tokens: EMPTY_TOKENS.clone(),
+            tokens: &EMPTY_TOKENS,
             current_token: 0,
         }
     }
 
-    pub fn set_tokens(&mut self, tokens: lexer::Tokens) {
+    pub fn set_tokens(&mut self, tokens: &'a lexer::Tokens) {
         self.tokens = tokens;
     }
 
@@ -226,7 +226,7 @@ impl Parser {
 
     pub fn reset(&mut self) {
         self.ast.root.clear();
-        self.tokens = EMPTY_TOKENS.clone();
+        self.tokens = &EMPTY_TOKENS;
         self.current_token = 0;
     }
 
@@ -416,7 +416,7 @@ impl Parser {
 
         // next token should be identifier
         self.current_token += 1;
-        let ident: String = match self.tokens.vec[self.current_token].clone() {
+        let ident: &String = match &self.tokens.vec[self.current_token] {
             lexer::Token::Ident(ident) => ident,
             _ => {
                 return Err("[E011] Expected identifier after let".to_string());

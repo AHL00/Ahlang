@@ -16,14 +16,14 @@ pub(crate) static BUILT_IN_TYPES: phf::Map<&'static str, DataType> = phf::phf_ma
 
 pub(crate) const BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
-pub struct Engine {
+pub struct Engine<'a> {
     pub lexer: Lexer,
-    pub parser: Parser,
+    pub parser: Parser<'a>,
     pub interpreter: Interpreter,
 }
 
-impl Engine {
-    pub fn new() -> Engine {
+impl<'a> Engine<'a> {
+    pub fn new() -> Engine<'a> {
         let lexer = Lexer::new();
         let parser = Parser::new();
         let interpreter = Interpreter::new();
@@ -39,58 +39,8 @@ impl Engine {
         // TODO: Error handling 
         self.lexer.set_input(script);
         let tokens = self.lexer.tokenize()?;
-        self.parser.set_tokens(tokens);
+        //self.parser.set_tokens(tokens);
         self.interpreter.run(self.parser.parse()?)
-    }
-}
-
-pub struct ReplEngine {
-    pub lexer: Lexer,
-    pub parser: Parser,
-    pub interpreter: Interpreter,
-    _line: String,
-}
-
-impl ReplEngine {
-    pub fn new() -> ReplEngine {
-        let lexer = Lexer::new();
-        let parser = Parser::new();
-        let interpreter = Interpreter::new();
-
-        ReplEngine {
-            lexer,
-            parser,
-            interpreter,
-            _line: String::new(),
-        }
-    }
-
-    pub fn eval(&mut self, statement: String) -> Result<(), String> {
-        self.parser.reset();
-        
-        self.lexer.set_input(statement);
-        let res = self.lexer.tokenize();
-        let tokens: lexer::Tokens;
-
-        if res.is_err() {
-            return Err(format!("Lexer error: {}", res.unwrap_err()));
-        } else {
-            tokens = res.unwrap();
-        }
-
-        self.parser.set_tokens(tokens);
-        let res = self.parser.parse();
-
-        if res.is_err() {
-            return Err(format!("Parser error: {}", res.unwrap_err()));
-        }
-
-        let res = self.interpreter.run(res.unwrap());
-        if res.is_err() {
-            return Err(format!("Interpreter error: {}", res.unwrap_err()));
-        }
-
-        Ok(())
     }
 }
 

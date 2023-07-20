@@ -62,7 +62,7 @@ pub(crate) static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
     "false" => Token::Literal(Literal::Bool(false)),
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Tokens {
     pub(crate) vec: Vec<Token>,
 }
@@ -88,7 +88,7 @@ impl Lexer {
         self.input = input;
     }
 
-    pub fn tokenize(&mut self) -> Result<Tokens, String> {
+    pub fn tokenize(&mut self) -> Result<&Tokens, String> {
         if self.input == "" {
             return Err("Empty input string".to_string());
         }
@@ -325,7 +325,7 @@ impl Lexer {
 
         self.tokens.vec.push(Token::Eof);
 
-        Ok(self.tokens.clone())
+        Ok(&self.tokens)
     }
 
     fn is_prefix(&self) -> bool {

@@ -40,7 +40,7 @@ impl Interpreter {
     }
 
     fn allocate_var(&mut self, identifier: &String, data: &Data) {
-        self.vars.insert(identifier.clone(), data.clone());
+        self.vars.insert(identifier.to_owned(), data.clone());
     }
 
     fn get_var(&self, identifier: &String) -> Option<&Data> {

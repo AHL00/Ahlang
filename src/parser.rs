@@ -30,10 +30,13 @@ impl<'a> Literal {
             ahlang::DataType::Str => {
                 self.data = Some(ahlang::Data::Str(data_str.to_owned()));
             }
-            ahlang::DataType::Bool => {
-                self.data = Some(ahlang::Data::Bool(
-                    data_str.parse::<bool>().expect("Failed to parse bool"),
+            ahlang::DataType::Char => {
+                self.data = Some(ahlang::Data::Char(
+                    data_str.chars().next().expect("Failed to parse char"),
                 ));
+            }
+            ahlang::DataType::Bool => {
+                panic!("Bool literals should be set directly as lexer::Literal::Bool is of type bool")
             }
         }
     }
@@ -116,12 +119,14 @@ impl Ast {
     fn print_recursive(&self, node: &AstNode, indent: String, is_last: bool) {
         match node {
             AstNode::Expression(expr) => match expr {
-                Expression::Identifier(identifier) => println!("{}IDENTIFIER({})", &indent, identifier),
+                Expression::Identifier(identifier) => {
+                    println!("{}IDENTIFIER({})", &indent, identifier)
+                }
                 Expression::Literal(literal) => {
                     println!("{}LITERAL", &indent);
                     println!("{}├── type: {:?}", &indent, literal.type_);
                     println!("{}└── data: {:?}", &indent, literal.data);
-                },
+                }
                 Expression::Prefix { operator, right } => {
                     println!("{}PREFIX", &indent);
                     println!("{}├── op: {:?}", &indent, operator);
@@ -132,13 +137,20 @@ impl Ast {
                     self.print_recursive(left, format!("{}├── ", &indent), false);
                     println!("{}└── op: {:?}", &indent, operator);
                 }
-                Expression::Infix { left, operator, right } => {
+                Expression::Infix {
+                    left,
+                    operator,
+                    right,
+                } => {
                     println!("{}INFIX", &indent);
                     self.print_recursive(left, format!("{}├── ", &indent), false);
                     println!("{}├── op: {:?}", &indent, operator);
                     self.print_recursive(right, format!("{}│   ", &indent), true);
                 }
-                Expression::Call { function, arguments } => {
+                Expression::Call {
+                    function,
+                    arguments,
+                } => {
                     println!("{}CALL", &indent);
                     println!("{}├── function: {}", &indent, function);
                     for (i, arg) in arguments.iter().enumerate() {
@@ -173,7 +185,6 @@ impl Ast {
             },
         }
     }
-    
 }
 
 impl std::fmt::Display for Ast {
@@ -274,16 +285,19 @@ impl<'a> Parser<'a> {
                 if is_prefix_operator(&op) {
                     let r_bp = binding_power(&op).1;
                     let right = self.parse_expr(end_token, Some(r_bp))?;
-                    lhs = Box::new(AstNode::Expression(Expression::Prefix { operator: op, right }));
+                    lhs = Box::new(AstNode::Expression(Expression::Prefix {
+                        operator: op,
+                        right,
+                    }));
                 } else {
                     return Err("[Esmth] Expected prefix operator".to_string());
                 }
             }
             _ => {
                 lhs = match self.tokens[self.current_token] {
-                    lexer::Token::Ident(ident) => {
-                        Box::new(AstNode::Expression(Expression::Identifier(ident.to_owned())))
-                    }
+                    lexer::Token::Ident(ident) => Box::new(AstNode::Expression(
+                        Expression::Identifier(ident.to_owned()),
+                    )),
                     lexer::Token::Literal(lit) => {
                         use lexer::Literal as LexerLiteral;
 
@@ -298,22 +312,38 @@ impl<'a> Parser<'a> {
                                 literal.set_data_from_str(data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
                             },
+                            LexerLiteral::Str(data) => {
+                                let mut literal = Literal::new(ahlang::DataType::Str);
+                                literal.set_data_from_str(data);
+                                Box::new(AstNode::Expression(Expression::Literal(literal)))
+                            },
+                            LexerLiteral::Char(data) => {
+                                let mut literal = Literal::new(ahlang::DataType::Char);
+                                literal.set_data_from_str(data);
+                                Box::new(AstNode::Expression(Expression::Literal(literal)))
+                            }
+                            LexerLiteral::Bool(data) => {
+                                let mut literal = Literal::new(ahlang::DataType::Bool);
+                                literal.data = Some(ahlang::Data::Bool(data));
+                                Box::new(AstNode::Expression(Expression::Literal(literal)))
+                            },
                         }
-                    },
+                    }
                     lexer::Token::LParen => {
                         let expr = self.parse_expr(&lexer::Token::RParen, None)?;
                         self.current_token += 1;
                         expr
                     }
-                    _ => {return Err(format!(
-                        "[E002] Unexpected token: {:?}",
-                        self.tokens[self.current_token]
-                    ))},
+                    _ => {
+                        return Err(format!(
+                            "[E002] Unexpected token: {:?}",
+                            self.tokens[self.current_token]
+                        ))
+                    }
                 }
             }
         }
-        
-    
+
         if min_bp.is_none() {
             min_bp = Some(0);
         }
@@ -384,7 +414,7 @@ impl<'a> Parser<'a> {
                 lexer::Token::Ident(type_) => {
                     todo!("Custom types are not yet supported");
                     // TODO: check if type exists
-                },
+                }
                 lexer::Token::Type(type_) => {
                     if ahlang::BUILT_IN_TYPES.contains_key(type_) {
                         ahlang::BUILT_IN_TYPES.get(type_).unwrap().clone()

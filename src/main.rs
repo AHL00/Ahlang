@@ -3,11 +3,14 @@ mod parser;
 mod interpreter;
 
 fn main() {
-    let test_input = "
+    let test_input = r#"
     let y: i32 = 12;
-    let z: i32 = (50000 + 50000) * 2;
+    let test: str = "Hello";
+    let x: bool = true;
+    let chr: char = 'c';
+    let z: str = (50000 + 50000) * 2;
     let test: f64 = 12 * (12.4);
-";
+"#;
 
     let start = std::time::Instant::now();
 
@@ -46,6 +49,6 @@ fn main() {
     let mut i = interpreter::Interpreter::new(p.get_ast());
     i.run();
 
-    println!("Interpreter time: {:?}", std::time::Instant::now() - i_start);
+    println!("\n\nInterpreter time: {:?}", std::time::Instant::now() - i_start);
     println!("Variables: {:?}", i.vars);
 }

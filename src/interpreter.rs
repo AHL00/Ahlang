@@ -68,7 +68,6 @@ impl<'a> Interpreter<'a> {
     }
 
     fn eval_stmt_let(&mut self, identifier: &String, type_: &ahlang::DataType, expr: &Box<AstNode>) -> Result<(), String> {
-        println!("Evaluating LET statement");
         let data: &Data;
 
         // evaluate expression

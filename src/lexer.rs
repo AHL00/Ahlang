@@ -1,7 +1,12 @@
+use std::thread::current;
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Literal<'a> {
     Int(&'a str),
     Float(&'a str),
+    Str(&'a str),
+    Char(&'a str),
+    Bool(bool),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -31,6 +36,8 @@ pub enum Token<'a> {
     Comma,
     Semicolon,
     Colon,
+    DoubleQuote,
+    SingleQuote,
 
     LParen,
     RParen,
@@ -53,6 +60,8 @@ pub static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
     "if" => Token::If,
     "else" => Token::Else,
     "return" => Token::Return,
+    "true" => Token::Literal(Literal::Bool(true)),
+    "false" => Token::Literal(Literal::Bool(false)),
 };
 
 pub struct Lexer<'a> {
@@ -111,6 +120,68 @@ impl<'a> Lexer<'a> {
 
                     continue;
                 }
+            }
+
+            if current_char == '"' {
+                // string literal
+                let mut next_char = char_iter.next();
+
+                if next_char.is_none() {
+                    return Err("Unexpected EOF".to_string());
+                }
+
+                let mut char_count = 1;
+
+                while next_char.is_some() {
+                    let (i, c) = next_char.unwrap();
+
+                    if c == '"' {
+                        break;
+                    }
+
+                    char_count += 1;
+                    next_char = char_iter.next();
+                }
+
+                if next_char.is_none() {
+                    return Err("Unexpected EOF".to_string());
+                }
+
+                self.tokens.push(Token::Literal(Literal::Str(
+                    &self.input[i + 1..i + char_count],
+                )));
+                continue;
+            }
+
+            if current_char == '\'' {
+                // char literal
+                let mut next_char = char_iter.next();
+
+                if next_char.is_none() {
+                    return Err("Unexpected EOF".to_string());
+                }
+
+                let mut char_count = 1;
+
+                while next_char.is_some() {
+                    let (i, c) = next_char.unwrap();
+
+                    if c == '\'' {
+                        break;
+                    }
+
+                    char_count += 1;
+                    next_char = char_iter.next();
+                }
+
+                if next_char.is_none() {
+                    return Err("Unexpected EOF".to_string());
+                }
+
+                self.tokens.push(Token::Literal(Literal::Char(
+                    &self.input[i + 1..i + char_count],
+                )));
+                continue;
             }
 
             if current_char.is_digit(10) {

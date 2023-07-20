@@ -853,7 +853,7 @@ let a: i32 = 12;
 
 fn main() {
     let start = std::time::Instant::now();
-    loop {
+    //loop {
         let mut l = Lexer::new();
         l.set_input(script.to_owned());
         let tokens = l.tokenize().unwrap();
@@ -869,7 +869,7 @@ fn main() {
                 return;
             }
         };
-    }
+    //}
     let end = std::time::Instant::now();
     println!("Parse time: {:?}", end - start);
 }

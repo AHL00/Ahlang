@@ -52,15 +52,16 @@ pub(crate) enum Token {
     Return,
 }
 
-pub(crate) static KEYWORDS: phf::Map<&'static str, Token> = phf::phf_map! {
-    "fn" => Token::Fn,
-    "let" => Token::Let,
-    "if" => Token::If,
-    "else" => Token::Else,
-    "return" => Token::Return,
-    "true" => Token::Literal(Literal::Bool(true)),
-    "false" => Token::Literal(Literal::Bool(false)),
-};
+pub(crate) const KEYWORDS: [&str; 7] = ["fn", "let", "if", "else", "return", "true", "false"];
+pub(crate) const KEYWORDS_TOKENS: [Token; 7] = [
+    Token::Fn,
+    Token::Let,
+    Token::If,
+    Token::Else,
+    Token::Return,
+    Token::Literal(Literal::Bool(true)),
+    Token::Literal(Literal::Bool(false)),
+];
 
 #[derive(Debug)]
 pub struct Tokens {
@@ -273,10 +274,11 @@ impl Lexer {
 
                 let literal = self.input[i..i + char_count].to_owned();
 
-                if KEYWORDS.contains_key(&literal) {
-                    self.tokens.vec.push(KEYWORDS[&literal].clone());
+                let found_kwd = KEYWORDS.iter().position(|&s| s == literal);
+                if found_kwd.is_some() {
+                    self.tokens.vec.push(KEYWORDS_TOKENS[found_kwd.unwrap()].clone());
                     continue;
-                } else if crate::BUILT_IN_TYPES.contains_key(&self.input[i..i + char_count]) {
+                } else if crate::BUILT_IN_TYPES.contains(&&self.input[i..i + char_count]) {
                     self.tokens.vec.push(Token::Type(literal));
                     continue;
                 } else if crate::BUILT_IN_FUNCS.contains(& &self.input[i..i + char_count]) {

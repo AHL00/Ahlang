@@ -6,13 +6,14 @@ pub use lexer::Lexer;
 pub use parser::Parser;
 pub use interpreter::Interpreter;
 
-pub(crate) static BUILT_IN_TYPES: phf::Map<&'static str, DataType> = phf::phf_map! {
-    "i32" => DataType::Int32,
-    "f64" => DataType::Float64,
-    "str" => DataType::Str,
-    "char" => DataType::Char,
-    "bool" => DataType::Bool,
-};
+pub(crate) const BUILT_IN_TYPES: [&str; 5] = ["i32", "f64", "str", "char", "bool"];
+pub(crate) const BUILT_IN_TYPES_DATA_TYPES: [DataType; 5] = [
+    DataType::Int32,
+    DataType::Float64,
+    DataType::Str,
+    DataType::Char,
+    DataType::Bool,
+];
 
 pub(crate) const BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
@@ -85,6 +86,29 @@ pub enum DataType {
     Str,
     Char,
     Bool,
+}
+
+impl DataType {
+    pub fn from_str(s: &str) -> Option<DataType> {
+        match s {
+            "i32" => Some(DataType::Int32),
+            "f64" => Some(DataType::Float64),
+            "str" => Some(DataType::Str),
+            "char" => Some(DataType::Char),
+            "bool" => Some(DataType::Bool),
+            _ => None,
+        }
+    }
+
+    pub fn to_str(&self) -> &'static str {
+        match self {
+            DataType::Int32 => "i32",
+            DataType::Float64 => "f64",
+            DataType::Str => "str",
+            DataType::Char => "char",
+            DataType::Bool => "bool",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

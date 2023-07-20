@@ -435,8 +435,12 @@ impl<'a> Parser<'a> {
                     // TODO: check if type exists
                 }
                 lexer::Token::Type(type_) => {
-                    if crate::BUILT_IN_TYPES.contains_key(type_.as_str()) {
-                        crate::BUILT_IN_TYPES.get(type_.as_str()).unwrap().clone()
+                    let type_index = crate::BUILT_IN_TYPES
+                        .iter()
+                        .position(|&t| t == type_.as_str());
+                    
+                    if type_index.is_some() {
+                        crate::BUILT_IN_TYPES_DATA_TYPES[type_index.unwrap()]
                     } else {
                         return Err(format!("[E016] Unknown type: {}", type_));
                     }

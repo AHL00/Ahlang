@@ -1,10 +1,10 @@
+pub mod interpreter;
 pub mod lexer;
 pub mod parser;
-pub mod interpreter;
 
+pub use interpreter::Interpreter;
 pub use lexer::Lexer;
 pub use parser::Parser;
-pub use interpreter::Interpreter;
 
 pub(crate) const BUILT_IN_TYPES: [&str; 5] = ["i32", "f64", "str", "char", "bool"];
 pub(crate) const BUILT_IN_TYPES_DATA_TYPES: [DataType; 5] = [
@@ -126,4 +126,3 @@ pub(crate) enum Operator {
     Identity,
     Negation,
 }
-

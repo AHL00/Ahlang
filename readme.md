@@ -31,6 +31,7 @@ fn example(y: i32) -> str {
 ## REPL
 - [X] Multiline input
 - [X] History
+
 ![REPL](/images/repl.png)
 
 ## Roadmap

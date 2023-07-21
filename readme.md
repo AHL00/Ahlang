@@ -6,6 +6,8 @@ Ahlang is a statically and strongly typed scripting language with a syntax *very
 ## Features
 - [ ] Static typing
 - [ ] Object oriented programming
+- [ ] REPL
+
 
 ## Syntax example
 ```rust
@@ -26,6 +28,10 @@ fn example(y: i32) -> str {
     return "Hello, world!";
 };
 ```
+## REPL
+- [X] Multiline input
+- [X] History
+![REPL](/images/repl.png)
 
 ## Roadmap
 - [x] Lexer

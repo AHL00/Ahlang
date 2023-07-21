@@ -111,8 +111,8 @@ fn repl() {
     let mut history_stack: Vec<String> = Vec::new();
     let mut history_ptr = 0;
 
-    println!("\x1B[34mAhlang REPL v{}\x1B[0m", env!("CARGO_PKG_VERSION"));
-    println!("\x1B[32mPress Ctrl + Z to exit, Ctrl + H for more information\x1B[0m");
+    println!("\x1B[33;1;4;5mAhlang REPL v{}\x1B[0m", env!("CARGO_PKG_VERSION"));
+    println!("\x1B[33;2mPress Ctrl + Z to exit, Ctrl + H for more information\x1B[0m");
 
     let stdout = io::stdout().into_raw_mode().unwrap();
     let mut stdout = io::BufWriter::new(stdout);

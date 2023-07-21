@@ -28,7 +28,7 @@ impl<'a> Literal {
                 ));
             }
             crate::DataType::Str => {
-                self.data = Some(crate::Data::Str(data_str.to_owned()));
+                self.data = Some(crate::Data::Str(Box::new(data_str.to_owned())));
             }
             crate::DataType::Char => {
                 self.data = Some(crate::Data::Char(

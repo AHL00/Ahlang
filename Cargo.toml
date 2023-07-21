@@ -8,13 +8,7 @@ name = "ahlang"
 path = "src/lib.rs"
 crate-type = ["lib", "cdylib"]
 
-[[bin]]
-name = "ahlang"
-
 [dependencies]
-
-[profile.release]
-debug = true
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
@@ -22,3 +16,6 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 [[bench]]
 name = "bench"
 harness = false
+
+[workspace]
+members = ["bin"]

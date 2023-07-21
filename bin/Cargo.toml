@@ -1,0 +1,12 @@
+[package]
+name = "ahlang-bin"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ahlang = { path = "../" }
+crossterm = "0.26.1"
+
+[[bin]]
+name = "ahlang"
+path = "src/main.rs"

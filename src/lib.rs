@@ -45,12 +45,37 @@ impl<'a> Engine<'a> {
     }
 }
 
+pub struct ReplEngine {
+    pub interpreter: Interpreter,
+}
+
+impl ReplEngine {
+    pub fn new() -> ReplEngine {
+        let interpreter = Interpreter::new();
+
+        ReplEngine { interpreter }
+    }
+
+    pub fn eval(&mut self, line: &str) -> Result<(), String> {
+        let mut lexer = Lexer::new();
+        let mut parser = Parser::new();
+
+        lexer.set_input(line);
+        let tokens = lexer.tokenize().map_err(|e| format!("[Lexer error] {}", e))?;
+
+        parser.set_tokens(tokens);
+        let ast = parser.parse().map_err(|e| format!("[Parser error] {}", e))?;
+
+        self.interpreter.run(ast)
+    }
+}
+
 // Exposed to allow data in and out of the interpreter
 #[derive(Debug, Clone)]
 pub enum Data {
     Int32(i32),
     Float64(f64),
-    Str(String),
+    Str(Box<String>),
     Char(char),
     Bool(bool),
 }

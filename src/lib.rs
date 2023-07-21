@@ -66,7 +66,7 @@ impl ReplEngine {
         parser.set_tokens(tokens);
         let ast = parser.parse().map_err(|e| format!("[Parser error] {}", e))?;
 
-        self.interpreter.run(ast)
+        self.interpreter.run(ast).map_err(|e| format!("[Interpreter error] {}", e))
     }
 }
 

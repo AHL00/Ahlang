@@ -1,12 +1,8 @@
-use std::{collections::VecDeque};
-use crossterm::{
-    event::{self, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind},
-    execute,
-    terminal::{self, ClearType},
-    ExecutableCommand,
-};
+use std::{collections::VecDeque, io};
 
 use ahlang::*;
+use termion::{raw::IntoRawMode, screen::{AlternateScreen, ToAlternateScreen}, input::TermRead, cursor};
+use std::io::Write;
 
 fn main() {
     // Binary entry point
@@ -69,45 +65,202 @@ fn main() {
     };
 }
 
+fn next_line() {
+    print!("\n");
+}
+
+fn line_start() {
+    print!("\x1B[0G");
+}
+
+fn line_end() {
+    print!("{}", termion::cursor::Right(2048));
+}
+
+fn move_right(n: u16) {
+    print!("{}", termion::cursor::Right(n));
+}
+
+fn next_line_start() {
+    print!("\n\x1B[0G");
+}
+
+fn delete_line() {
+    print!("\x1B[2K");
+}
+
+fn last_line() {
+    print!("\x1B[1F");
+}
+
+
+const continuation_line: &str = ".. ";
+const start_line: &str = "> ";
+
 fn repl() {
-    use std::io::Write;
-    
     let mut engine = ReplEngine::new();
 
-    let mut history_stack: Stack<String> = Stack::new(10);
+    let mut history_stack: Vec<String> = Vec::new();
     let mut history_ptr = 0;
 
     println!("\x1B[34mAhlang REPL v{}\x1B[0m", env!("CARGO_PKG_VERSION"));
     println!("\x1B[32mType 'exit' to exit, 'help' for more information\x1B[0m");
 
-    execute!(
-        std::io::stdout(),
-        terminal::Clear(ClearType::FromCursorDown),
-        terminal::SetTitle("Ahlang REPL"),
+    let stdout = io::stdout().into_raw_mode().unwrap();
+    let mut stdout = io::BufWriter::new(stdout);
 
-    )
-    .unwrap();
+    // enable raw mode
+    let stdin = io::stdin();
+    let mut events = stdin.events();
 
-    loop {
-        print!("> ");
-        std::io::stdout().flush().unwrap();
-        
+    'repl: loop {
+
+        write!(stdout, "\x1B[32m{}\x1B[0m", start_line).unwrap();
+        stdout.flush().unwrap();
+
         let mut input = String::new();
         history_ptr = history_stack.len();
-        
-        std::io::stdin().read_line(&mut input).unwrap();
-        input = input.trim().to_owned();
-        
-        if input == "exit" {
-            return;
+
+        let mut line_start_locs = vec![0];
+
+        loop {
+            if let Some(Ok(event)) = events.next() {
+                match event {
+                    termion::event::Event::Key(key) => {
+                        match key {
+                            termion::event::Key::Char(chr) => {
+                                if chr == '\n' {
+                                    next_line_start();
+                                    // if input isnt ending in semicolon, don't break, go to next line and print ..
+                                    let is_comment = input.starts_with("//");
+
+                                    if input.ends_with(';') || is_comment || input.is_empty() {
+                                        break;
+                                    } else {
+                                        // add \n to input
+                                        input.push('\n');
+
+                                        // save where in the input this line starts
+                                        line_start_locs.push(input.len());
+
+                                        write!(stdout, "{}", continuation_line).unwrap();
+                                        stdout.flush().unwrap();
+                                        continue;
+                                    }
+                                }
+
+                                input.push(chr);
+                                print!("{}", chr);
+                                stdout.flush().unwrap();
+                            },
+                            termion::event::Key::Ctrl('c') => {
+                                next_line_start();
+                                print!("\x1B[33m! Exiting...\x1B[0m");
+                                next_line_start();
+                                break 'repl;
+                            },
+                            termion::event::Key::Backspace => {
+                                // if we are at the start of the line, don't delete
+                                if input.len() == *line_start_locs.last().unwrap_or(&0) {
+                                    // if line_start_locs.len() > 1, this is a continuation line
+                                    // so we need to delete the .. and go back to the previous line
+                                    if line_start_locs.len() > 1 {
+                                        // delete .. and go back to previous line
+                                        delete_line();
+                                        last_line();
+                                        
+                                        input.pop(); // pop the \n
+                                        line_start_locs.pop(); // pop the line start location
+
+                                        // check characters on this line
+                                        let mut chars_on_line = input.len() - line_start_locs[line_start_locs.len() - 1];
+                                        // account for line start
+                                        if line_start_locs.len() == 1 {
+                                            chars_on_line += start_line.len();
+                                        } else {
+                                            chars_on_line += continuation_line.len();
+                                        }
+
+                                        move_right(chars_on_line as u16);
+
+                                        stdout.flush().unwrap();
+                                    }
+                                    continue;
+                                }
+
+                                // delete the last char and pop it from the input
+                                input.pop();
+                                write!(stdout, "\x08 \x08").unwrap();
+                                stdout.flush().unwrap();
+                            },
+                            termion::event::Key::Left => {
+                                print!("{}", termion::cursor::Left(1));
+                                stdout.flush().unwrap();
+                            },
+                            termion::event::Key::Right => {
+                                print!("{}", termion::cursor::Right(1));
+                                stdout.flush().unwrap();
+                            },
+                            termion::event::Key::Up => {
+                                if history_ptr == 0 {
+                                    continue;
+                                }
+
+                                history_ptr -= 1;
+
+                                delete_line();
+                                line_start();
+
+                                input = history_stack[history_ptr].clone();
+                                print!("{}", input);
+                                stdout.flush().unwrap();
+                            },
+                            termion::event::Key::Down => {
+                                if history_ptr == history_stack.len() {
+                                    continue;
+                                }
+
+                                history_ptr += 1;
+
+                                delete_line();
+                                line_start();
+
+                                if history_ptr == history_stack.len() {
+                                    input = String::new();
+                                } else {
+                                    input = history_stack[history_ptr].clone();
+                                }
+
+                                print!("{}", input);
+                                stdout.flush().unwrap();
+                            },
+                            _ => {}
+                        }
+                    },
+                    _ => {}
+                }
+            }
         }
-        
-        if input == "help" {
-            println!("Type 'exit' to exit, 'help' for more information");
+
+        input = input.trim().to_owned();
+
+        if input.starts_with("//") {
             continue;
         }
-        
-        if input != "" {
+
+        if input == "exit" {
+            write!(stdout, "\x1B[31m! Exiting\x1B[0m").unwrap();
+            break;
+        }
+
+        if input == "help" {
+            println!("Type 'exit' to exit, 'help' for more information");
+            println!("If a line ends with a semicolon, it will be evaluated immediately.");
+            println!("Otherwise, the statement will be continued on the next line with '.. '");
+            continue;
+        }
+
+        if !input.is_empty() {
             history_stack.push(input.clone());
         }
 
@@ -115,10 +268,14 @@ fn repl() {
 
         if res.is_err() {
             println!("\x1B[31m! {}\x1B[0m", res.unwrap_err());
+            line_start();
             continue;
         }
+
+        line_start();
     }
 }
+
 
 struct Stack<T> {
     deque: VecDeque<T>,

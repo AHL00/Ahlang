@@ -27,9 +27,10 @@ fn main() {
     }
 
     let file = std::fs::read_to_string(&args[1]).unwrap();
+    let source_str = file.as_str();
     
     let mut l = Lexer::new();
-    l.set_input(file);
+    l.set_input(source_str);
 
     let res = l.tokenize();
     let tokens: &lexer::Tokens;
@@ -71,7 +72,7 @@ fn repl() {
 
         let mut input = String::new();
         std::io::stdin().read_line(&mut input).unwrap();
-        input = input.trim().to_string();
+        input = input.trim().to_owned();
 
         if input == "exit" {
             return;

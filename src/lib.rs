@@ -18,7 +18,7 @@ pub(crate) const BUILT_IN_TYPES_DATA_TYPES: [DataType; 5] = [
 pub(crate) const BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
 pub struct Engine<'a> {
-    pub lexer: Lexer,
+    pub lexer: Lexer<'a>,
     pub parser: Parser<'a>,
     pub interpreter: Interpreter,
 }
@@ -36,12 +36,12 @@ impl<'a> Engine<'a> {
         }
     }
 
-    pub fn run(&mut self, script: String) -> Result<(), String> {
-        // TODO: Error handling 
+    pub fn run(&'a mut self, script: &'a str) -> Result<(), String> {
         self.lexer.set_input(script);
         let tokens = self.lexer.tokenize()?;
-        //self.parser.set_tokens(tokens);
-        self.interpreter.run(self.parser.parse()?)
+        self.parser.set_tokens(tokens);
+        let ast = self.parser.parse()?;
+        self.interpreter.run(ast)
     }
 }
 

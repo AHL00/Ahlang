@@ -1,14 +1,14 @@
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Literal {
-    Int(String),
-    Float(String),
-    Str(String),
-    Char(String),
+pub(crate) enum Literal<'a> {
+    Int(&'a str),
+    Float(&'a str),
+    Str(&'a str),
+    Char(&'a str),
     Bool(bool),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Token {
+pub(crate) enum Token<'a> {
     Illegal,
     // { TODO: Add line and column number to token to use in error messages
     //     line: usize,
@@ -17,14 +17,14 @@ pub(crate) enum Token {
     Eof,
 
     // Identifiers / literals / funcs
-    Ident(String),
-    Literal(Literal),
-    Func(String),
+    Ident(&'a str),
+    Literal(Literal<'a>),
+    Func(&'a str),
 
-    Type(String),
+    Type(&'a str),
     
     // Built-in functions
-    built_in_func(String),
+    built_in_func(&'a str),
 
     // Operators
     Assign,
@@ -64,19 +64,19 @@ pub(crate) const KEYWORDS_TOKENS: [Token; 7] = [
 ];
 
 #[derive(Debug)]
-pub struct Tokens {
-    pub(crate) vec: Vec<Token>,
+pub struct Tokens<'a> {
+    pub(crate) vec: Vec<Token<'a>>,
 }
 
-pub struct Lexer {
-    input: String,
-    tokens: Tokens,
+pub struct Lexer<'a> {
+    input: &'a str,
+    tokens: Tokens<'a>,
 }
 
-impl Lexer {
-    pub fn new() -> Lexer {
+impl<'a> Lexer<'a> {
+    pub fn new() -> Lexer<'a> {
         Lexer {
-            input: "".to_string(),
+            input: "",
             tokens: Tokens { vec: Vec::new() },
         }
     }
@@ -85,7 +85,7 @@ impl Lexer {
         &self.tokens
     }
 
-    pub fn set_input(&mut self, input: String) {
+    pub fn set_input(&mut self, input: &'a str) {
         self.input = input;
     }
 
@@ -162,7 +162,7 @@ impl Lexer {
                 }
 
                 self.tokens.vec.push(Token::Literal(Literal::Str(
-                    self.input[i + 1..i + char_count].to_owned(),
+                    &self.input[i + 1..i + char_count],
                 )));
                 continue;
             }
@@ -193,7 +193,7 @@ impl Lexer {
                 }
 
                 self.tokens.vec.push(Token::Literal(Literal::Char(
-                    self.input[i + 1..i + char_count].to_owned(),
+                    &self.input[i + 1..i + char_count],
                 )));
                 continue;
             }
@@ -240,11 +240,11 @@ impl Lexer {
 
                 if float {
                     self.tokens.vec.push(Token::Literal(Literal::Float(
-                        self.input[i..i + char_count].to_owned(),
+                        &self.input[i..i + char_count],
                     )));
                 } else {
                     self.tokens.vec.push(Token::Literal(Literal::Int(
-                        self.input[i..i + char_count].to_owned(),
+                        &self.input[i..i + char_count],
                     )));
                 }
 
@@ -272,16 +272,16 @@ impl Lexer {
                     }
                 }
 
-                let literal = self.input[i..i + char_count].to_owned();
+                let literal = &self.input[i..i + char_count];
 
                 let found_kwd = KEYWORDS.iter().position(|&s| s == literal);
                 if found_kwd.is_some() {
                     self.tokens.vec.push(KEYWORDS_TOKENS[found_kwd.unwrap()].clone());
                     continue;
-                } else if crate::BUILT_IN_TYPES.contains(&&self.input[i..i + char_count]) {
+                } else if crate::BUILT_IN_TYPES.contains(&literal) {
                     self.tokens.vec.push(Token::Type(literal));
                     continue;
-                } else if crate::BUILT_IN_FUNCS.contains(& &self.input[i..i + char_count]) {
+                } else if crate::BUILT_IN_FUNCS.contains(&literal) {
                     self.tokens.vec.push(Token::built_in_func(literal));
                     continue;
                 } else {

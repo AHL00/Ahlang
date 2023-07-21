@@ -8,7 +8,7 @@ let b: i32 = -20 + a;
 
 fn main() {
     let mut engine = Engine::new();
-    match engine.run(script.to_string()) {
+    match engine.run(script) {
         Ok(_) => {},
         Err(e) => {
             println!("Error: {}", e);

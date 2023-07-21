@@ -15,7 +15,7 @@ impl Literal {
 }
 
 impl<'a> Literal {
-    pub fn set_data_from_str(&mut self, data_str: &String) {
+    pub fn set_data_from_str(&mut self, data_str: &'a str) {
         match self.type_ {
             crate::DataType::Int32 => {
                 self.data = Some(crate::Data::Int32(
@@ -114,7 +114,7 @@ pub struct Ast {
 }
 
 impl Ast {
-    fn new() -> Ast {
+    pub const fn new() -> Ast {
         Ast { root: Vec::new() }
     }
 
@@ -203,7 +203,7 @@ static EMPTY_TOKENS: lexer::Tokens = lexer::Tokens { vec: Vec::new() };
 
 pub struct Parser<'a> {
     ast: Ast,
-    tokens: &'a lexer::Tokens,
+    tokens: &'a lexer::Tokens<'a>,
     current_token: usize,
 }
 
@@ -315,7 +315,7 @@ impl<'a> Parser<'a> {
             _ => {
                 lhs = match &self.tokens.vec[self.current_token] {
                     lexer::Token::Ident(ident) => Box::new(AstNode::Expression(
-                        Expression::Identifier(ident.to_owned()),
+                        Expression::Identifier((*ident).to_owned()),
                     )),
                     lexer::Token::Literal(lit) => {
                         use lexer::Literal as LexerLiteral;
@@ -323,22 +323,22 @@ impl<'a> Parser<'a> {
                         match lit {
                             LexerLiteral::Int(data) => {
                                 let mut literal = Literal::new(crate::DataType::Int32);
-                                literal.set_data_from_str(data);
+                                literal.set_data_from_str(*data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
                             }
                             LexerLiteral::Float(data) => {
                                 let mut literal = Literal::new(crate::DataType::Float64);
-                                literal.set_data_from_str(data);
+                                literal.set_data_from_str(*data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
                             }
                             LexerLiteral::Str(data) => {
                                 let mut literal = Literal::new(crate::DataType::Str);
-                                literal.set_data_from_str(data);
+                                literal.set_data_from_str(*data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
                             }
                             LexerLiteral::Char(data) => {
                                 let mut literal = Literal::new(crate::DataType::Char);
-                                literal.set_data_from_str(data);
+                                literal.set_data_from_str(*data);
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
                             }
                             LexerLiteral::Bool(data) => {
@@ -416,8 +416,8 @@ impl<'a> Parser<'a> {
 
         // next token should be identifier
         self.current_token += 1;
-        let ident: &String = match &self.tokens.vec[self.current_token] {
-            lexer::Token::Ident(ident) => ident,
+        let ident: String = match &self.tokens.vec[self.current_token] {
+            lexer::Token::Ident(ident) => (*ident).to_owned(),
             _ => {
                 return Err("[E011] Expected identifier after let".to_string());
             }
@@ -437,8 +437,8 @@ impl<'a> Parser<'a> {
                 lexer::Token::Type(type_) => {
                     let type_index = crate::BUILT_IN_TYPES
                         .iter()
-                        .position(|&t| t == type_.as_str());
-                    
+                        .position(|&t| t == *type_);
+
                     if type_index.is_some() {
                         crate::BUILT_IN_TYPES_DATA_TYPES[type_index.unwrap()]
                     } else {

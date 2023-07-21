@@ -855,7 +855,7 @@ fn main() {
     let start = std::time::Instant::now();
     //loop {
         let mut l = Lexer::new();
-        l.set_input(script.to_owned());
+        l.set_input(script);
         let tokens = l.tokenize().unwrap();
 
         let mut p = Parser::new();

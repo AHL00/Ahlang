@@ -46,10 +46,11 @@ impl<'a> Literal {
 
 #[derive(Debug)]
 pub(crate) enum Statement {
-    Let {
+    Alloc {
         identifier: String,
         type_: crate::DataType,
         expr: Box<AstNode>,
+        mut_: bool,
     },
     Assign {
         identifier: String,
@@ -181,21 +182,23 @@ impl Ast {
                 }
             },
             AstNode::Statement(stmt) => match stmt {
-                Statement::Let {
+                Statement::Alloc {
                     identifier,
                     type_,
                     expr: value,
+                    mut_: mut_,
                 } => {
                     let current_indent = if is_last {
                         indent
                     } else {
                         format!("{}", &indent)
                     };
-                    println!("{}LET", &current_indent);
+                    println!("{}ALLOC", &current_indent);
                     println!("{}├── identifier: {}", &current_indent, identifier);
                     println!("{}├── type: {:?}", &current_indent, type_);
+                    println!("{}├── mut: {}", &current_indent, mut_);
                     self.print_recursive(value, format!("{}└── ", &current_indent), true);
-                }
+                },
                 Statement::Assign { identifier, expr } => {
                     let current_indent = if is_last {
                         indent
@@ -205,7 +208,7 @@ impl Ast {
                     println!("{}ASSIGN", &current_indent);
                     println!("{}├── identifier: {}", &current_indent, identifier);
                     self.print_recursive(expr, format!("{}└── ", &current_indent), true);
-                }
+                },
                 Statement::If => println!("{}IF", &indent),
                 Statement::Else => println!("{}ELSE", &indent),
                 Statement::Return => println!("{}RETURN", &indent),
@@ -283,7 +286,8 @@ impl<'a> Parser<'a> {
     fn parse_token(&mut self) -> Result<(), String> {
         // Used for both main and block statements
         let parse_res = match self.tokens.vec[self.current_token] {
-            lexer::Token::Let => self.parse_let(),
+            lexer::Token::Let => self.parse_alloc(true),
+            lexer::Token::Const => self.parse_alloc(false),
             lexer::Token::Ident(s) => {
                 // check if next token is an assign operator
                 if self.peek() == &lexer::Token::Assign {
@@ -473,12 +477,12 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_let(&mut self) -> Result<(), String> {
-        // start with let
-        // do nothing and move on
+    fn parse_alloc(&mut self, mut_: bool) -> Result<(), String> {
+        // start with let or const
+        // ignore and move on
+        self.current_token += 1;
 
         // next token should be identifier
-        self.current_token += 1;
         let ident: String = match &self.tokens.vec[self.current_token] {
             lexer::Token::Ident(ident) => (*ident).to_owned(),
             _ => {
@@ -536,10 +540,11 @@ impl<'a> Parser<'a> {
         self.expect_semicolon()?;
 
         // Add let statement to ast
-        self.ast.root.push(AstNode::Statement(Statement::Let {
+        self.ast.root.push(AstNode::Statement(Statement::Alloc {
             identifier: ident.to_owned(),
             type_: type_,
             expr,
+            mut_: mut_,
         }));
 
         Ok(())

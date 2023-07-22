@@ -47,15 +47,17 @@ pub(crate) enum Token<'a> {
     // Keywords
     Fn,
     Let,
+    Const,
     If,
     Else,
     Return,
 }
 
-pub(crate) const KEYWORDS: [&str; 7] = ["fn", "let", "if", "else", "return", "true", "false"];
-pub(crate) const KEYWORDS_TOKENS: [Token; 7] = [
+pub(crate) const KEYWORDS: [&str; 8] = ["fn", "let", "const", "if", "else", "return", "true", "false"];
+pub(crate) const KEYWORDS_TOKENS: [Token; 8] = [
     Token::Fn,
     Token::Let,
+    Token::Const,
     Token::If,
     Token::Else,
     Token::Return,

@@ -8,7 +8,7 @@ mod opers;
 pub struct Var {
     data: Data,
     type_: crate::DataType,
-    mutable: bool,
+    mut_: bool,
 }
 
 pub struct Interpreter {
@@ -63,19 +63,15 @@ impl Interpreter {
     fn eval_statement(&mut self, node: &AstNode) -> Result<(), String> {
         match node {
             AstNode::Statement(stmt) => match stmt {
-                Statement::Let {
-                    identifier,
-                    type_,
-                    expr,
-                } => {
-                    self.eval_stmt_let(identifier, type_, expr)?;
+                Statement::Alloc { identifier, type_, expr, mut_ } => {
+                    self.eval_stmt_alloc(identifier, type_, expr, *mut_)?;
                 }
                 Statement::Assign { identifier, expr } => {
                     self.eval_stmt_assign(identifier, expr)?;
                 }
                 _ => {
                     return Err("[DEV] Statement type not implemented yet".to_string());
-                }
+                },
             },
             _ => {
                 return Err("Expected statement".to_string());
@@ -93,8 +89,8 @@ impl Interpreter {
             return Err("Expression type does not match variable type".to_string());
         }
 
-        if !var_mut.mutable {
-            return Err("Variable is not mutable".to_string());
+        if !var_mut.mut_ {
+            return Err("Can't mutate a constant".to_string());
         }
 
         var_mut.data = data;
@@ -104,14 +100,16 @@ impl Interpreter {
 
     //fn eval_stmt_fn_call(&mut self) -> Result<(), String> {}
 
-    fn eval_stmt_let(
+    fn eval_stmt_alloc(
         &mut self,
         identifier: &String,
         type_: &crate::DataType,
         node: &Box<AstNode>,
+        mut_: bool,
     ) -> Result<(), String> {
         // evaluate expression
         let data = self.eval_expression(node)?;
+
         // check if type matches
         if data.get_type() != *type_ {
             return Err("Expression type does not match variable type".to_string());
@@ -121,7 +119,7 @@ impl Interpreter {
         self.allocate_var(identifier, Var {
             data,
             type_: type_.clone(),
-            mutable: true,
+            mut_,
         });
 
         Ok(())
@@ -147,7 +145,6 @@ impl Interpreter {
                     return self.eval_infix_expr(operator, left, right);
                 }
                 Expression::VarIdentifier(identifier) => {
-                    // TODO: Change to use Var struct
                     return self
                         .get_var(identifier)
                         .ok_or("Variable not found".to_string())

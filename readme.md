@@ -2,6 +2,7 @@
 Ahlang is a statically and strongly typed scripting language with a syntax *very* inspired by Rust. It's designed to be a general purpose scripting language that can be easily embedded in other Rust programs. Although performance is a major consideration, it's not expected to be able to compete in this aspect with other more established scripting languages like Lua.
 
 [![Build](https://github.com/AHL00/Ahlang/workflows/Build/badge.svg)](https://github.com/AHL00/Ahlang/actions/workflows/build_check.yml)
+[![Lines of code](https://tokei.rs/b1/github/AHL00/Ahlang?category=code)](https://github.com/AHL00/Ahlang)
 
 ## Features
 - [ ] Static typing

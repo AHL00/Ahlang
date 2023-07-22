@@ -1,16 +1,4 @@
-const script: &str = r#"
-    // let x: i32 = 12 + -3 * -4;
-    // const y: str = "Hello, " + "world!";
-    let x: i32 = 512;
-    let z: i32 = x + (12 % 5);
-
-    if x == 512 {
-        x = 12;
-    }
-"#;
-const debug: bool = true;
-
-fn main() {
+pub fn run(script: &str, debug: bool) {
     let mut start = std::time::Instant::now();
 
     let mut l = ahlang::Lexer::new();
@@ -78,8 +66,4 @@ fn main() {
     println!(">> Total time: {:?}", lexer_time + parser_time + run_time);
     
     println!();
-
-
-    // println!("Vars: {:#?}", i.vars);
-
 }

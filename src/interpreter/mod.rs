@@ -82,6 +82,9 @@ impl Interpreter {
                 Statement::If { expr, block } => {
                     self.eval_stmt_if(expr, block)?;
                 },
+                Statement::While { expr, block } => {
+                    self.eval_stmt_while(expr, block)?;
+                },
                 Statement::None => {
                     // do nothing
                 },
@@ -109,6 +112,17 @@ impl Interpreter {
             _ => {
                 return Err(format!("Expression evaluates to {:?}, should be bool", data.get_type()).to_string());
             }
+        }
+
+        Ok(())
+    }
+
+    fn eval_stmt_while(&mut self, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
+        let mut data = self.eval_expression(expr)?;
+
+        while let Data::Bool(true) = data {
+            self.eval_block(block)?;
+            data = self.eval_expression(expr)?;
         }
 
         Ok(())

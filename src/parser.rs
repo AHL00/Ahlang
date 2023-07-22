@@ -60,6 +60,10 @@ pub(crate) enum Statement {
         expr: Box<AstNode>,
         block: Box<Ast>,
     },
+    While {
+        expr: Box<AstNode>,
+        block: Box<Ast>,
+    },
     Else,
     Return,
     None,
@@ -227,7 +231,18 @@ impl Ast {
                     self.print_recursive(expr, format!("{}├── ", &current_indent), false);
                     println!("{}└── block", &current_indent);
                     //self.print_recursive(block, format!("{}└── ", &current_indent), true);
-                }
+                },
+                Statement::While { expr, block } => {
+                    let current_indent = if is_last {
+                        indent
+                    } else {
+                        format!("{}", &indent)
+                    };
+                    println!("{}WHILE", &current_indent);
+                    self.print_recursive(expr, format!("{}├── ", &current_indent), false);
+                    println!("{}└── block", &current_indent);
+                    //self.print_recursive(block, format!("{}└── ", &current_indent), true);
+                },
                 Statement::Else => println!("{}ELSE", &indent),
                 Statement::Return => println!("{}RETURN", &indent),
                 Statement::None => println!("{}NONE", &indent),
@@ -351,6 +366,7 @@ impl<'a> Parser<'a> {
                 }
             }
             lexer::Token::If => self.parse_if(),
+            lexer::Token::While => self.parse_while(),
             lexer::Token::Eof => {
                 // End the parser by moving the current token to the end
                 self.current_token += 1;
@@ -596,6 +612,22 @@ impl<'a> Parser<'a> {
         Ok(AstNode::Statement(Statement::If { expr, block }))
     }
 
+    fn parse_while(&mut self) -> Result<AstNode, String> {
+        // start with while
+        // ignore and move on
+        self.current_token += 1;
+
+        // next token is expression
+        // parse_expr requires the token before the expression
+        self.current_token -= 1;
+        let expr = self.parse_expr(&lexer::Token::LBrace, None)?;
+
+        // next token is block
+        self.current_token += 1;
+        let block = self.parse_block()?;
+
+        Ok(AstNode::Statement(Statement::While { expr, block }))
+    }
     /// Expects the next token to be a semicolon, and moves to the next token
     fn expect_semicolon_and_next(&mut self) -> Result<(), String> {
         self.current_token += 1;

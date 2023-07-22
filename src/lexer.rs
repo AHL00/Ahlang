@@ -53,18 +53,20 @@ pub(crate) enum Token<'a> {
     Const,
     If,
     Else,
+    While,
     Return,
 }
 
-pub(crate) const KEYWORDS: [&str; 8] = [
-    "fn", "let", "const", "if", "else", "return", "true", "false",
+pub(crate) const KEYWORDS: [&str; 9] = [
+    "fn", "let", "const", "if", "else", "while", "return", "true", "false",
 ];
-pub(crate) const KEYWORDS_TOKENS: [Token; 8] = [
+pub(crate) const KEYWORDS_TOKENS: [Token; 9] = [
     Token::Fn,
     Token::Let,
     Token::Const,
     Token::If,
     Token::Else,
+    Token::While,
     Token::Return,
     Token::Literal(Literal::Bool(true)),
     Token::Literal(Literal::Bool(false)),

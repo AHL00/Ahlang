@@ -14,7 +14,7 @@ crate-type = ["lib", "cdylib"]
 criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]
-name = "bench"
+name = "while_iter"
 harness = false
 
 [workspace]

@@ -51,6 +51,10 @@ pub(crate) enum Statement {
         type_: crate::DataType,
         expr: Box<AstNode>,
     },
+    Assign {
+        identifier: String,
+        expr: Box<AstNode>,
+    },
     If,
     Else,
     Return,
@@ -90,7 +94,7 @@ fn is_prefix_operator(operator: &crate::Operator) -> bool {
 
 #[derive(Debug)]
 pub(crate) enum Expression {
-    Identifier(String),
+    VarIdentifier(String),
     Literal(Literal),
     Prefix {
         operator: crate::Operator,
@@ -132,7 +136,7 @@ impl Ast {
     fn print_recursive(&self, node: &AstNode, indent: String, is_last: bool) {
         match node {
             AstNode::Expression(expr) => match expr {
-                Expression::Identifier(identifier) => {
+                Expression::VarIdentifier(identifier) => {
                     println!("{}IDENTIFIER({})", &indent, identifier)
                 }
                 Expression::Literal(literal) => {
@@ -191,6 +195,16 @@ impl Ast {
                     println!("{}├── identifier: {}", &current_indent, identifier);
                     println!("{}├── type: {:?}", &current_indent, type_);
                     self.print_recursive(value, format!("{}└── ", &current_indent), true);
+                }
+                Statement::Assign { identifier, expr } => {
+                    let current_indent = if is_last {
+                        indent
+                    } else {
+                        format!("{}", &indent)
+                    };
+                    println!("{}ASSIGN", &current_indent);
+                    println!("{}├── identifier: {}", &current_indent, identifier);
+                    self.print_recursive(expr, format!("{}└── ", &current_indent), true);
                 }
                 Statement::If => println!("{}IF", &indent),
                 Statement::Else => println!("{}ELSE", &indent),
@@ -270,6 +284,17 @@ impl<'a> Parser<'a> {
         // Used for both main and block statements
         let parse_res = match self.tokens.vec[self.current_token] {
             lexer::Token::Let => self.parse_let(),
+            lexer::Token::Ident(s) => {
+                // check if next token is an assign operator
+                if self.peek() == &lexer::Token::Assign {
+                    self.parse_assign()
+                }
+
+                // if not don't do anything
+                else {
+                    Ok(())
+                }
+            },
             lexer::Token::Eof => Ok(()),
             _ => Err(format!(
                 "[E001] Unexpected token: {:?}",
@@ -326,7 +351,7 @@ impl<'a> Parser<'a> {
             _ => {
                 lhs = match &self.tokens.vec[self.current_token] {
                     lexer::Token::Ident(ident) => Box::new(AstNode::Expression(
-                        Expression::Identifier((*ident).to_owned()),
+                        Expression::VarIdentifier((*ident).to_owned()),
                     )),
                     lexer::Token::Literal(lit) => {
                         use lexer::Literal as LexerLiteral;
@@ -421,6 +446,33 @@ impl<'a> Parser<'a> {
         return Ok(lhs);
     }
 
+    fn parse_assign(&mut self) -> Result<(), String> {
+        // start with identifier
+        let ident: &str = match &self.tokens.vec[self.current_token] {
+            lexer::Token::Ident(ident) => *ident,
+            _ => {
+                return Err("[E003] Expected identifier after assign operator".to_string());
+            }
+        };
+
+        // next token is assign operator
+        self.current_token += 1;
+
+        // all the tokens until the semicolon are the expression
+        let expr = self.parse_expr(&lexer::Token::Semicolon, None)?;
+
+        // next token is semicolon
+        self.expect_semicolon()?;
+
+        // Add assign statement to ast
+        self.ast.root.push(AstNode::Statement(Statement::Assign {
+            identifier: ident.to_owned(),
+            expr,
+        }));
+
+        Ok(())
+    }
+
     fn parse_let(&mut self) -> Result<(), String> {
         // start with let
         // do nothing and move on
@@ -481,10 +533,7 @@ impl<'a> Parser<'a> {
         }
 
         // Next token is semicolon
-        self.current_token += 1;
-        if self.tokens.vec[self.current_token] != lexer::Token::Semicolon {
-            return Err("[E015] Expected semicolon after expression".to_string());
-        }
+        self.expect_semicolon()?;
 
         // Add let statement to ast
         self.ast.root.push(AstNode::Statement(Statement::Let {
@@ -492,6 +541,16 @@ impl<'a> Parser<'a> {
             type_: type_,
             expr,
         }));
+
+        Ok(())
+    }
+
+    /// Expects the next token to be a semicolon, and moves to the next token
+    fn expect_semicolon(&mut self) -> Result<(), String> {
+        self.current_token += 1;
+        if self.tokens.vec[self.current_token] != lexer::Token::Semicolon {
+            return Err("[E004] Expected semicolon".to_string());
+        }
 
         Ok(())
     }

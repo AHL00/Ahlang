@@ -2,6 +2,7 @@ const script: &str = r#"
     let x: i32 = 12 + -3 * -4;
     let y: str = "Hello, " + "world!";
     let z: i32 = x + (12 % 5);
+    x = "hello";
 "#;
 
 fn main() {
@@ -30,12 +31,17 @@ fn main() {
     };
 
     let run_time = std::time::Instant::now() - start;
+    println!("{}", p.get_ast());
+
+    println!();
+
     println!("Lexer time: {:?}", lexer_time);
     println!("Parser time: {:?}", parser_time);
     println!("Run time: {:?}", run_time);
     println!(">> Total time: {:?}", lexer_time + parser_time + run_time);
     
     println!();
+
 
     println!("Vars: {:#?}", i.vars);
 

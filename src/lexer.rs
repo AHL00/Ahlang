@@ -24,7 +24,7 @@ pub(crate) enum Token<'a> {
     Type(&'a str),
     
     // Built-in functions
-    built_in_func(&'a str),
+    Built_in_func(&'a str),
 
     // Operators
     Assign,
@@ -87,6 +87,12 @@ impl<'a> Lexer<'a> {
 
     pub fn set_input(&mut self, input: &'a str) {
         self.input = input;
+        self.reserve_tokens_vec(4)
+    }
+
+    /// Optimization: Reserve space for tokens vector
+    pub fn reserve_tokens_vec(&mut self, average_token_len: usize) {
+        self.tokens.vec.reserve(self.input.len() / average_token_len);
     }
 
     pub fn tokenize(&mut self) -> Result<&Tokens, String> {
@@ -282,7 +288,7 @@ impl<'a> Lexer<'a> {
                     self.tokens.vec.push(Token::Type(literal));
                     continue;
                 } else if crate::BUILT_IN_FUNCS.contains(&literal) {
-                    self.tokens.vec.push(Token::built_in_func(literal));
+                    self.tokens.vec.push(Token::Built_in_func(literal));
                     continue;
                 } else {
                     self.tokens.vec.push(Token::Ident(literal));
@@ -360,7 +366,7 @@ impl<'a> Lexer<'a> {
         if last.is_none()
             || !matches!(
                 last.unwrap(),
-                Token::Literal(_) | Token::Ident(_) | Token::RParen | Token::RSquare | Token::RBrace | Token::built_in_func(_) | Token::Func(_)
+                Token::Literal(_) | Token::Ident(_) | Token::RParen | Token::RSquare | Token::RBrace | Token::Built_in_func(_) | Token::Func(_)
             )
         {
             return true;

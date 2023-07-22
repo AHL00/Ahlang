@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, io};
 
 use ahlang::*;
-use termion::{raw::IntoRawMode, screen::{AlternateScreen, ToAlternateScreen}, input::TermRead, cursor};
+use termion::{raw::IntoRawMode, input::TermRead};
 use std::io::Write;
 
 fn main() {
@@ -130,6 +130,7 @@ fn repl() {
         history_ptr = history_stack.len();
 
         let mut line_start_locs = vec![0];
+        let mut in_block = 0;
 
         loop {
             if let Some(Ok(event)) = events.next() {
@@ -137,12 +138,17 @@ fn repl() {
                     termion::event::Event::Key(key) => {
                         match key {
                             termion::event::Key::Char(chr) => {
+                                if chr == '{' {
+                                    in_block += 1;
+                                } else if chr == '}' {
+                                    in_block -= 1;
+                                }
+
                                 if chr == '\n' {
                                     next_line_start();
-                                    // if input isnt ending in semicolon, don't break, go to next line and print ..
+                                    // if input isnt ending in semicolon or rbrace, don't break, go to next line and print ..
                                     let is_comment = input.starts_with("//");
-
-                                    if input.ends_with(';') || is_comment || input.is_empty() {
+                                    if ((input.ends_with(';') || input.ends_with('}')) && in_block < 1) || is_comment || input.is_empty() {
                                         break;
                                     } else {
                                         // add \n to input
@@ -211,7 +217,17 @@ fn repl() {
                                 }
 
                                 // delete the last char and pop it from the input
-                                input.pop();
+                                let popped = input.pop();
+                                if popped.is_none() {
+                                    continue;
+                                }
+                                let popped = popped.unwrap();
+
+                                if popped == '{' {
+                                    in_block -= 1;
+                                } else if popped == '}' {
+                                    in_block += 1;
+                                }
                                 write!(stdout, "\x08 \x08").unwrap();
                                 stdout.flush().unwrap();
                             },
@@ -360,6 +376,7 @@ fn repl() {
         }
 
         let res = engine.eval(input.as_str());
+        //let res: Result<(), String> = Ok(());
 
         if res.is_err() {
             println!("\x1B[31m! {}\x1B[0m", res.unwrap_err());

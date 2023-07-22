@@ -68,6 +68,14 @@ pub fn modulo(a: Data, b: Data) -> Result<Data, String> {
     }
 }
 
+pub fn power(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Int32(a.pow(b as u32))),
+        (Data::Float64(a), Data::Float64(b)) => Ok(Data::Float64(a.powf(b))),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
 pub fn equals(a: Data, b: Data) -> Result<Data, String> {
     match (a, b) {
         (Data::Int32(a), Data::Int32(b)) => Ok(Data::Bool(a == b)),
@@ -75,6 +83,106 @@ pub fn equals(a: Data, b: Data) -> Result<Data, String> {
         (Data::Str(a), Data::Str(b)) => Ok(Data::Bool(a == b)),
         (Data::Char(a), Data::Char(b)) => Ok(Data::Bool(a == b)),
         (Data::Bool(a), Data::Bool(b)) => Ok(Data::Bool(a == b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn not_equal(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Bool(a != b)),
+        (Data::Float64(a), Data::Float64(b)) => Ok(Data::Bool(a != b)),
+        (Data::Str(a), Data::Str(b)) => Ok(Data::Bool(a != b)),
+        (Data::Char(a), Data::Char(b)) => Ok(Data::Bool(a != b)),
+        (Data::Bool(a), Data::Bool(b)) => Ok(Data::Bool(a != b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn less_than(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Bool(a < b)),
+        (Data::Float64(a), Data::Float64(b)) => Ok(Data::Bool(a < b)),
+        (Data::Str(a), Data::Str(b)) => Ok(Data::Bool(a < b)),
+        (Data::Char(a), Data::Char(b)) => Ok(Data::Bool(a < b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn less_than_or_equal(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Bool(a <= b)),
+        (Data::Float64(a), Data::Float64(b)) => Ok(Data::Bool(a <= b)),
+        (Data::Str(a), Data::Str(b)) => Ok(Data::Bool(a <= b)),
+        (Data::Char(a), Data::Char(b)) => Ok(Data::Bool(a <= b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn greater_than(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Bool(a > b)),
+        (Data::Float64(a), Data::Float64(b)) => Ok(Data::Bool(a > b)),
+        (Data::Str(a), Data::Str(b)) => Ok(Data::Bool(a > b)),
+        (Data::Char(a), Data::Char(b)) => Ok(Data::Bool(a > b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn greater_than_or_equal(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Bool(a >= b)),
+        (Data::Float64(a), Data::Float64(b)) => Ok(Data::Bool(a >= b)),
+        (Data::Str(a), Data::Str(b)) => Ok(Data::Bool(a >= b)),
+        (Data::Char(a), Data::Char(b)) => Ok(Data::Bool(a >= b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn and(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Bool(a), Data::Bool(b)) => Ok(Data::Bool(a && b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn or(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Bool(a), Data::Bool(b)) => Ok(Data::Bool(a || b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn bitwise_and(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Int32(a & b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn bitwise_or(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Int32(a | b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn bitwise_xor(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) => Ok(Data::Int32(a ^ b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn bitwise_left_shift(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) if b >= 0 => Ok(Data::Int32(a << b)),
+        (a, b) => Err(type_mismatch(&a, &b)),
+    }
+}
+
+pub fn bitwise_right_shift(a: Data, b: Data) -> Result<Data, String> {
+    match (a, b) {
+        (Data::Int32(a), Data::Int32(b)) if b >= 0 => Ok(Data::Int32(a >> b)),
         (a, b) => Err(type_mismatch(&a, &b)),
     }
 }

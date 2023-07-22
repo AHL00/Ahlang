@@ -87,8 +87,6 @@ impl<'a> std::fmt::Display for Tokens<'a> {
     }
 }
 
-// TODO: Bug, identifiers can't start with a digit, can't include _
-
 pub struct Lexer<'a> {
     input: &'a str,
     tokens: Tokens<'a>,
@@ -344,73 +342,61 @@ impl<'a> Lexer<'a> {
                         Token::Operator(Operator::Minus)
                     }
                 }
-                ('=', _) => {
-                    match peek {
-                        '=' => {
-                            char_iter.next();
-                            Token::Operator(Operator::Equals)
-                        },
-                        '>' => {
-                            char_iter.next();
-                            Token::FatArrow
-                        }
-                        _ => Token::Assign,
+                ('=', _) => match peek {
+                    '=' => {
+                        char_iter.next();
+                        Token::Operator(Operator::Equals)
                     }
+                    '>' => {
+                        char_iter.next();
+                        Token::FatArrow
+                    }
+                    _ => Token::Assign,
                 },
                 ('*', _) => Token::Operator(Operator::Asterisk),
                 ('/', _) => Token::Operator(Operator::Slash),
-                ('!', _) => {
-                    match peek {
-                        '=' => {
-                            char_iter.next();
-                            Token::Operator(Operator::NotEqual)
-                        },
-                        _ => Token::Operator(Operator::Not),
+                ('!', _) => match peek {
+                    '=' => {
+                        char_iter.next();
+                        Token::Operator(Operator::NotEqual)
                     }
+                    _ => Token::Operator(Operator::Not),
                 },
-                ('<', _) => {
-                    match peek {
-                        '=' => {
-                            char_iter.next();
-                            Token::Operator(Operator::LessThanEqual)
-                        },
-                        '<' => {
-                            char_iter.next();
-                            Token::Operator(Operator::LeftShift)
-                        },
-                        _ => Token::Operator(Operator::LessThan),
+                ('<', _) => match peek {
+                    '=' => {
+                        char_iter.next();
+                        Token::Operator(Operator::LessThanOrEqual)
                     }
+                    '<' => {
+                        char_iter.next();
+                        Token::Operator(Operator::LeftShift)
+                    }
+                    _ => Token::Operator(Operator::LessThan),
                 },
-                ('>', _) => {
-                    match peek {
-                        '=' => {
-                            char_iter.next();
-                            Token::Operator(Operator::GreaterThanEqual)
-                        },
-                        '>' => {
-                            char_iter.next();
-                            Token::Operator(Operator::RightShift)
-                        },
-                        _ => Token::Operator(Operator::GreaterThan),
+                ('>', _) => match peek {
+                    '=' => {
+                        char_iter.next();
+                        Token::Operator(Operator::GreaterThanOrEqual)
                     }
+                    '>' => {
+                        char_iter.next();
+                        Token::Operator(Operator::RightShift)
+                    }
+                    _ => Token::Operator(Operator::GreaterThan),
                 },
-                ('&', _) => {
-                    match peek {
-                        '&' => {
-                            char_iter.next();
-                            Token::Operator(Operator::And)
-                        },
-                        _ => Token::Operator(Operator::BitwiseAnd),
+                ('&', _) => match peek {
+                    '&' => {
+                        char_iter.next();
+                        Token::Operator(Operator::And)
                     }
+                    _ => Token::Operator(Operator::BitwiseAnd),
                 },
-                ('|', _) => {
-                    match peek {
-                        '|' => {
-                            char_iter.next();
-                            Token::Operator(Operator::Or)
-                        },
-                        _ => Token::Operator(Operator::BitwiseOr),
+                ('|', _) => match peek {
+                    '|' => {
+                        char_iter.next();
+                        Token::Operator(Operator::Or)
                     }
+                    _ => Token::Operator(Operator::BitwiseOr),
                 },
                 ('%', _) => Token::Operator(Operator::Modulo),
                 ('^', _) => Token::Operator(Operator::Caret),

@@ -1,5 +1,5 @@
 use crate::parser::{AstNode, Expression, Statement, Ast};
-use crate::{parser, Data};
+use crate::{parser, Data, Operator};
 use std::collections::HashMap;
 
 mod opers;
@@ -207,23 +207,59 @@ impl Interpreter {
         let right = self.eval_expression(right)?;
 
         match operator {
-            crate::Operator::Plus => {
+            Operator::Plus => {
                 data = opers::addition(left, right)?;
             },
-            crate::Operator::Minus => {
+            Operator::Minus => {
                 data = opers::subtraction(left, right)?;
             },
-            crate::Operator::Asterisk => {
+            Operator::Asterisk => {
                 data = opers::multiplication(left, right)?;
             },
-            crate::Operator::Slash => {
+            Operator::Slash => {
                 data = opers::division(left, right)?;
             },
-            crate::Operator::Modulo => {
+            Operator::Modulo => {
                 data = opers::modulo(left, right)?;
             },
-            crate::Operator::Equals => {
+            Operator::Caret => {
+                data = opers::power(left, right)?;
+            },
+            Operator::Equals => {
                 data = opers::equals(left, right)?;
+            },
+            Operator::NotEqual => {
+                data = opers::not_equal(left, right)?;
+            },
+            Operator::LessThan => {
+                data = opers::less_than(left, right)?;
+            },
+            Operator::LessThanOrEqual => {
+                data = opers::less_than_or_equal(left, right)?;
+            },
+            Operator::GreaterThan => {
+                data = opers::greater_than(left, right)?;
+            },
+            Operator::GreaterThanOrEqual => {
+                data = opers::greater_than_or_equal(left, right)?;
+            },
+            Operator::And => {
+                data = opers::and(left, right)?;
+            },
+            Operator::Or => {
+                data = opers::or(left, right)?;
+            },
+            Operator::BitwiseAnd => {
+                data = opers::bitwise_and(left, right)?;
+            },
+            Operator::BitwiseOr => {
+                data = opers::bitwise_or(left, right)?;
+            },
+            Operator::LeftShift => {
+                data = opers::bitwise_left_shift(left, right)?;
+            },
+            Operator::RightShift => {
+                data = opers::bitwise_right_shift(left, right)?;
             },
             _ => {
                 return Err("This operator can't be used as an infix".to_string());
@@ -244,10 +280,10 @@ impl Interpreter {
         let res = self.eval_expression(right)?;
 
         match operator {
-            crate::Operator::Negation => {
+            Operator::Negation => {
                 data = opers::negation(res)?;
             }
-            crate::Operator::Not => {
+            Operator::Not => {
                 data = opers::not(res)?;
             }
             _ => {

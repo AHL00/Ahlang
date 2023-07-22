@@ -76,8 +76,8 @@ fn binding_power(operator: &crate::Operator) -> (u8, u8) {
         // Comparison operators
         crate::Operator::LessThan
         | crate::Operator::GreaterThan
-        | crate::Operator::LessThanEqual
-        | crate::Operator::GreaterThanEqual
+        | crate::Operator::LessThanOrEqual
+        | crate::Operator::GreaterThanOrEqual
         | crate::Operator::Equals
         | crate::Operator::NotEqual => (1, 2),
 

@@ -165,8 +165,8 @@ pub(crate) enum Operator {
 
     LessThan,
     GreaterThan,
-    LessThanEqual,
-    GreaterThanEqual,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
     Equals,
     NotEqual,
 

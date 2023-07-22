@@ -70,6 +70,7 @@ pub(crate) const KEYWORDS_TOKENS: [Token; 8] = [
     Token::Literal(Literal::Bool(false)),
 ];
 
+#[derive(Debug)]
 pub struct Tokens<'a> {
     pub(crate) vec: Vec<Token<'a>>,
 }

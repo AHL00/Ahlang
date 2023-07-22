@@ -7,7 +7,7 @@ Ahlang is a statically and strongly typed scripting language with a syntax *very
 ## Features
 - [ ] Static typing
 - [ ] Object oriented programming
-- [ ] REPL
+- [X] REPL
 
 
 ## Syntax example

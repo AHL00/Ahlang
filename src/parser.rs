@@ -344,8 +344,9 @@ impl<'a> Parser<'a> {
                 if self.peek() == &lexer::Token::Assign {
                     self.parse_assign()
                 }
-                // if not don't do anything
+                // move to next token
                 else {
+                    self.current_token += 1;
                     Ok(AstNode::Statement(Statement::None))
                 }
             }

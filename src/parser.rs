@@ -59,14 +59,25 @@ pub(crate) enum Statement {
 fn binding_power(operator: &crate::Operator) -> (u8, u8) {
     match operator {
         // infix
-        crate::Operator::Plus | crate::Operator::Minus => (3, 4),
-        crate::Operator::Asterisk | crate::Operator::Slash => (5, 6),
+        crate::Operator::Plus 
+        | crate::Operator::Minus => (3, 4),
+
+        crate::Operator::Asterisk 
+        | crate::Operator::Slash
+        | crate::Operator::Modulo => (5, 6),
+
         crate::Operator::Caret => (7, 8),
+
+        crate::Operator::LessThan
+        | crate::Operator::GreaterThan
+        | crate::Operator::LessThanEqual
+        | crate::Operator::GreaterThanEqual => (1, 2),
 
         // prefix
         crate::Operator::Not => (0, 7),
         crate::Operator::Identity => (0, 7),
         crate::Operator::Negation => (0, 7),
+
     }
 }
 

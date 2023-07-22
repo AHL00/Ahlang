@@ -145,9 +145,16 @@ pub(crate) enum Operator {
     Asterisk,
     Slash,
     Caret,
+    Modulo,
 
     // Unary operators
     Not,
     Identity,
     Negation,
+
+    // Comparison operators
+    LessThan,
+    GreaterThan,
+    LessThanEqual,
+    GreaterThanEqual,
 }

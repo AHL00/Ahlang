@@ -2,7 +2,7 @@ use ahlang::Engine;
 
 static script: &'static str = r#"
 let a: i32 = 10;
-let b: i32 = -20 + a;
+let b: i32 = -20;
 "#;
 
 

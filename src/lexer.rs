@@ -310,7 +310,32 @@ impl<'a> Lexer<'a> {
                 '/' => self.tokens.vec.push(Token::Operator(crate::Operator::Slash)),
                 '!' => {
                     self.tokens.vec.push(Token::Operator(crate::Operator::Not));
-                }
+                },
+                '<' => {
+                    let peek = char_iter.peek();
+                    if peek.is_none() {
+                        return Err("Unexpected EOF".to_string());
+                    }
+                    if peek.unwrap().1 == '=' {
+                        self.tokens.vec.push(Token::Operator(crate::Operator::LessThanEqual));
+                        char_iter.next();
+                    } else {
+                        self.tokens.vec.push(Token::Operator(crate::Operator::LessThan));
+                    }
+                },
+                '>' => {
+                    let peek = char_iter.peek();
+                    if peek.is_none() {
+                        return Err("Unexpected EOF".to_string());
+                    }
+                    if peek.unwrap().1 == '=' {
+                        self.tokens.vec.push(Token::Operator(crate::Operator::GreaterThanEqual));
+                        char_iter.next();
+                    } else {
+                        self.tokens.vec.push(Token::Operator(crate::Operator::GreaterThan));
+                    }
+                },
+                '%' => self.tokens.vec.push(Token::Operator(crate::Operator::Modulo)),
                 '^' => self.tokens.vec.push(Token::Operator(crate::Operator::Caret)),
                 ',' => self.tokens.vec.push(Token::Comma),
                 ';' => self.tokens.vec.push(Token::Semicolon),

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-
 use crate::{parser, Data};
+use crate::parser::{AstNode, Expression, Statement};
 
-use crate::parser::{AstNode, Expression, Statement, Literal};
+mod opers;
 
 pub struct Interpreter {
     // TODO: Make vars private
@@ -103,10 +103,23 @@ impl Interpreter {
             AstNode::Expression(expr) => match expr {
                 Expression::Literal(literal) => {
                     return literal.data.clone().ok_or("Literal has no data".to_owned());
-                }
-                // Expression::Prefix { operator, right } => {
-                //     return self.eval_prefix_expr(operator, right);
-                // }
+                },
+                Expression::Prefix { operator, right } => {
+                    return self.eval_prefix_expr(operator, right);
+                },
+                Expression::Infix {
+                    operator,
+                    left,
+                    right,
+                } => {
+                    return self.eval_infix_expr(operator, left, right);
+                },
+                Expression::Identifier(identifier) => {
+                    return self
+                        .get_var(identifier)
+                        .ok_or("Variable not found".to_string())
+                        .map(|x| x.clone());
+                },
                 _ => {
                     return Err("Expression type not implemented yet".to_string());
                 }
@@ -117,16 +130,65 @@ impl Interpreter {
         };
     }
 
-    // fn eval_prefix_expr(
-    //     &self,
-    //     operator: &crate::Operator,
-    //     right: &Box<AstNode>,
-    // ) -> Result<&Data, String> {
-    //     let data: &Data;
+    fn eval_infix_expr(
+        &mut self,
+        operator: &crate::Operator,
+        left: &Box<AstNode>,
+        right: &Box<AstNode>,
+    ) -> Result<Data, String> {
+        let data: Data;
 
-    //     // evaluate expression
-    //     let res = self.eval_expression(right);
+        // evaluate expressions
+        let left = self.eval_expression(left)?;
+        let right = self.eval_expression(right)?;
 
-    //     Err("Not implemented".to_string())
-    // }
+        match operator {
+            crate::Operator::Plus => {
+                data = opers::addition(left, right)?;
+            },
+            crate::Operator::Minus => {
+                data = opers::subtraction(left, right)?;
+            },
+            crate::Operator::Asterisk => {
+                data = opers::multiplication(left, right)?;
+            },
+            crate::Operator::Slash => {
+                data = opers::division(left, right)?;
+            },
+            crate::Operator::Modulo => {
+                data = opers::modulo(left, right)?;
+            },
+            _ => {
+                return Err("This operator can't be used as an infix".to_string());
+            }
+        };
+
+        Ok(data)
+    }
+
+    fn eval_prefix_expr(
+        &mut self,
+        operator: &crate::Operator,
+        right: &Box<AstNode>,
+    ) -> Result<Data, String> {
+        let data: Data;
+
+        // evaluate expression
+        let res = self.eval_expression(right)?;
+
+        match operator {
+            crate::Operator::Negation => {
+                data = opers::negation(res)?;
+            }
+            crate::Operator::Not => {
+                data = opers::not(res)?;
+            }
+            _ => {
+                return Err("This operator can't be used as a prefix".to_string());
+            }
+        };
+
+        Ok(data)
+    }
 }
+

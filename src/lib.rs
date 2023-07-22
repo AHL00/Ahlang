@@ -144,17 +144,28 @@ pub(crate) enum Operator {
     Minus,
     Asterisk,
     Slash,
+    /// Power and bitwise xor
     Caret,
     Modulo,
 
-    // Unary operators
-    Not,
-    Identity,
-    Negation,
+    BitwiseAnd,
+    BitwiseOr,
+    LeftShift,
+    RightShift,
 
-    // Comparison operators
     LessThan,
     GreaterThan,
     LessThanEqual,
     GreaterThanEqual,
+    Equals,
+    NotEqual,
+
+    And,
+    Or,
+
+    // Prefix operators
+    /// Bools and bitwise not
+    Not,
+    Identity,
+    Negation,
 }

@@ -63,7 +63,6 @@ pub(crate) enum Statement {
 
 fn binding_power(operator: &crate::Operator) -> (u8, u8) {
     match operator {
-        // infix
         crate::Operator::Plus 
         | crate::Operator::Minus => (3, 4),
 
@@ -73,16 +72,26 @@ fn binding_power(operator: &crate::Operator) -> (u8, u8) {
 
         crate::Operator::Caret => (7, 8),
 
+        // Comparison operators
         crate::Operator::LessThan
         | crate::Operator::GreaterThan
         | crate::Operator::LessThanEqual
-        | crate::Operator::GreaterThanEqual => (1, 2),
+        | crate::Operator::GreaterThanEqual 
+        | crate::Operator::Equals
+        | crate::Operator::NotEqual => (1, 2),
 
-        // prefix
+        // Logical operators
+        crate::Operator::And 
+        | crate::Operator::Or => (9, 10),
+
+        // Prefix
         crate::Operator::Not => (0, 7),
         crate::Operator::Identity => (0, 7),
         crate::Operator::Negation => (0, 7),
 
+        _ => {
+            panic!("Unknown operator: {:?}", operator);
+        }
     }
 }
 

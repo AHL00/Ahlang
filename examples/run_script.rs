@@ -2,7 +2,7 @@ const script: &str = r#"
     let x: i32 = 12 + -3 * -4;
     const y: str = "Hello, " + "world!";
     let z: i32 = x + (12 % 5);
-    x = 512;    
+    x = 512;
     //y = "Can't mutate constants";
 "#;
 const debug: bool = false;

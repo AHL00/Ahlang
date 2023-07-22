@@ -1,3 +1,5 @@
+use crate::Operator;
+
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum Literal<'a> {
     Int(&'a str),
@@ -22,13 +24,14 @@ pub(crate) enum Token<'a> {
     Func(&'a str),
 
     Type(&'a str),
-    
+
     // Built-in functions
     Built_in_func(&'a str),
 
     // Operators
     Assign,
     Operator(crate::Operator),
+    FatArrow,
 
     // Delimiters
     Comma,
@@ -53,7 +56,9 @@ pub(crate) enum Token<'a> {
     Return,
 }
 
-pub(crate) const KEYWORDS: [&str; 8] = ["fn", "let", "const", "if", "else", "return", "true", "false"];
+pub(crate) const KEYWORDS: [&str; 8] = [
+    "fn", "let", "const", "if", "else", "return", "true", "false",
+];
 pub(crate) const KEYWORDS_TOKENS: [Token; 8] = [
     Token::Fn,
     Token::Let,
@@ -94,7 +99,9 @@ impl<'a> Lexer<'a> {
 
     /// Optimization: Reserve space for tokens vector
     pub fn reserve_tokens_vec(&mut self, average_token_len: usize) {
-        self.tokens.vec.reserve(self.input.len() / average_token_len);
+        self.tokens
+            .vec
+            .reserve(self.input.len() / average_token_len);
     }
 
     pub fn tokenize(&mut self) -> Result<&Tokens, String> {
@@ -251,9 +258,9 @@ impl<'a> Lexer<'a> {
                         &self.input[i..i + char_count],
                     )));
                 } else {
-                    self.tokens.vec.push(Token::Literal(Literal::Int(
-                        &self.input[i..i + char_count],
-                    )));
+                    self.tokens
+                        .vec
+                        .push(Token::Literal(Literal::Int(&self.input[i..i + char_count])));
                 }
 
                 continue;
@@ -284,7 +291,9 @@ impl<'a> Lexer<'a> {
 
                 let found_kwd = KEYWORDS.iter().position(|&s| s == literal);
                 if found_kwd.is_some() {
-                    self.tokens.vec.push(KEYWORDS_TOKENS[found_kwd.unwrap()].clone());
+                    self.tokens
+                        .vec
+                        .push(KEYWORDS_TOKENS[found_kwd.unwrap()].clone());
                     continue;
                 } else if crate::BUILT_IN_TYPES.contains(&literal) {
                     self.tokens.vec.push(Token::Type(literal));
@@ -298,64 +307,110 @@ impl<'a> Lexer<'a> {
                 }
             }
 
-            match current_char {
-                '=' => self.tokens.vec.push(Token::Assign),
-                '+' => {
+            let peek_opt = char_iter.peek();
+            // EOF char
+            let mut peek = ' ';
+
+            if peek_opt.is_some() {
+                peek = peek_opt.unwrap().1;
+            }
+
+            self.tokens.vec.push(match (current_char, peek) {
+                ('+', _) => {
                     if self.is_prefix() {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::Identity));
+                        Token::Operator(Operator::Identity)
                     } else {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::Plus));
-                    }
-                },
-                '-' => {
-                    if self.is_prefix() {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::Negation));
-                    } else {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::Minus));
+                        Token::Operator(Operator::Plus)
                     }
                 }
-                '*' => self.tokens.vec.push(Token::Operator(crate::Operator::Asterisk)),
-                '/' => self.tokens.vec.push(Token::Operator(crate::Operator::Slash)),
-                '!' => {
-                    self.tokens.vec.push(Token::Operator(crate::Operator::Not));
-                },
-                '<' => {
-                    let peek = char_iter.peek();
-                    if peek.is_none() {
-                        return Err("Unexpected EOF".to_string());
-                    }
-                    if peek.unwrap().1 == '=' {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::LessThanEqual));
-                        char_iter.next();
+                ('-', _) => {
+                    if self.is_prefix() {
+                        Token::Operator(Operator::Negation)
                     } else {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::LessThan));
+                        Token::Operator(Operator::Minus)
+                    }
+                }
+                ('=', _) => {
+                    match peek {
+                        '=' => {
+                            char_iter.next();
+                            Token::Operator(Operator::Equals)
+                        },
+                        '>' => {
+                            char_iter.next();
+                            Token::FatArrow
+                        }
+                        _ => Token::Assign,
                     }
                 },
-                '>' => {
-                    let peek = char_iter.peek();
-                    if peek.is_none() {
-                        return Err("Unexpected EOF".to_string());
-                    }
-                    if peek.unwrap().1 == '=' {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::GreaterThanEqual));
-                        char_iter.next();
-                    } else {
-                        self.tokens.vec.push(Token::Operator(crate::Operator::GreaterThan));
+                ('*', _) => Token::Operator(Operator::Asterisk),
+                ('/', _) => Token::Operator(Operator::Slash),
+                ('!', _) => {
+                    match peek {
+                        '=' => {
+                            char_iter.next();
+                            Token::Operator(Operator::NotEqual)
+                        },
+                        _ => Token::Operator(Operator::Not),
                     }
                 },
-                '%' => self.tokens.vec.push(Token::Operator(crate::Operator::Modulo)),
-                '^' => self.tokens.vec.push(Token::Operator(crate::Operator::Caret)),
-                ',' => self.tokens.vec.push(Token::Comma),
-                ';' => self.tokens.vec.push(Token::Semicolon),
-                ':' => self.tokens.vec.push(Token::Colon),
-                '(' => self.tokens.vec.push(Token::LParen),
-                ')' => self.tokens.vec.push(Token::RParen),
-                '{' => self.tokens.vec.push(Token::LBrace),
-                '}' => self.tokens.vec.push(Token::RBrace),
-                '[' => self.tokens.vec.push(Token::LSquare),
-                ']' => self.tokens.vec.push(Token::RSquare),
-                _ => self.tokens.vec.push(Token::Illegal),
-            }
+                ('<', _) => {
+                    match peek {
+                        '=' => {
+                            char_iter.next();
+                            Token::Operator(Operator::LessThanEqual)
+                        },
+                        '<' => {
+                            char_iter.next();
+                            Token::Operator(Operator::LeftShift)
+                        },
+                        _ => Token::Operator(Operator::LessThan),
+                    }
+                },
+                ('>', _) => {
+                    match peek {
+                        '=' => {
+                            char_iter.next();
+                            Token::Operator(Operator::GreaterThanEqual)
+                        },
+                        '>' => {
+                            char_iter.next();
+                            Token::Operator(Operator::RightShift)
+                        },
+                        _ => Token::Operator(Operator::GreaterThan),
+                    }
+                },
+                ('&', _) => {
+                    match peek {
+                        '&' => {
+                            char_iter.next();
+                            Token::Operator(Operator::And)
+                        },
+                        _ => Token::Operator(Operator::BitwiseAnd),
+                    }
+                },
+                ('|', _) => {
+                    match peek {
+                        '|' => {
+                            char_iter.next();
+                            Token::Operator(Operator::Or)
+                        },
+                        _ => Token::Operator(Operator::BitwiseOr),
+                    }
+                },
+                ('%', _) => Token::Operator(Operator::Modulo),
+                ('^', _) => Token::Operator(Operator::Caret),
+                (',', _) => Token::Comma,
+                (';', _) => Token::Semicolon,
+                (':', _) => Token::Colon,
+                ('(', _) => Token::LParen,
+                (')', _) => Token::RParen,
+                ('{', _) => Token::LBrace,
+                ('}', _) => Token::RBrace,
+                ('[', _) => Token::LSquare,
+                (']', _) => Token::RSquare,
+                _ => Token::Illegal,
+            })
         }
 
         self.tokens.vec.push(Token::Eof);
@@ -368,7 +423,13 @@ impl<'a> Lexer<'a> {
         if last.is_none()
             || !matches!(
                 last.unwrap(),
-                Token::Literal(_) | Token::Ident(_) | Token::RParen | Token::RSquare | Token::RBrace | Token::Built_in_func(_) | Token::Func(_)
+                Token::Literal(_)
+                    | Token::Ident(_)
+                    | Token::RParen
+                    | Token::RSquare
+                    | Token::RBrace
+                    | Token::Built_in_func(_)
+                    | Token::Func(_)
             )
         {
             return true;

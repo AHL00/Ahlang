@@ -103,6 +103,7 @@ impl Data {
     }
 }
 
+// TODO: Remove and use Data(_) instead?
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum DataType {

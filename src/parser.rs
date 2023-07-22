@@ -56,19 +56,20 @@ pub(crate) enum Statement {
         identifier: String,
         expr: Box<AstNode>,
     },
-    If,
+    If {
+        expr: Box<AstNode>,
+        block: Box<Ast>,
+    },
     Else,
     Return,
+    None,
 }
 
 fn binding_power(operator: &crate::Operator) -> (u8, u8) {
     match operator {
-        crate::Operator::Plus 
-        | crate::Operator::Minus => (3, 4),
+        crate::Operator::Plus | crate::Operator::Minus => (3, 4),
 
-        crate::Operator::Asterisk 
-        | crate::Operator::Slash
-        | crate::Operator::Modulo => (5, 6),
+        crate::Operator::Asterisk | crate::Operator::Slash | crate::Operator::Modulo => (5, 6),
 
         crate::Operator::Caret => (7, 8),
 
@@ -76,13 +77,12 @@ fn binding_power(operator: &crate::Operator) -> (u8, u8) {
         crate::Operator::LessThan
         | crate::Operator::GreaterThan
         | crate::Operator::LessThanEqual
-        | crate::Operator::GreaterThanEqual 
+        | crate::Operator::GreaterThanEqual
         | crate::Operator::Equals
         | crate::Operator::NotEqual => (1, 2),
 
         // Logical operators
-        crate::Operator::And 
-        | crate::Operator::Or => (9, 10),
+        crate::Operator::And | crate::Operator::Or => (9, 10),
 
         // Prefix
         crate::Operator::Not => (0, 7),
@@ -129,7 +129,6 @@ pub(crate) enum Expression {
 #[derive(Debug)]
 pub(crate) enum AstNode {
     Expression(Expression),
-
     Statement(Statement),
 }
 
@@ -195,7 +194,7 @@ impl Ast {
                     identifier,
                     type_,
                     expr: value,
-                    mut_: mut_,
+                    mut_,
                 } => {
                     let current_indent = if is_last {
                         indent
@@ -207,7 +206,7 @@ impl Ast {
                     println!("{}├── type: {:?}", &current_indent, type_);
                     println!("{}├── mut: {}", &current_indent, mut_);
                     self.print_recursive(value, format!("{}└── ", &current_indent), true);
-                },
+                }
                 Statement::Assign { identifier, expr } => {
                     let current_indent = if is_last {
                         indent
@@ -217,10 +216,21 @@ impl Ast {
                     println!("{}ASSIGN", &current_indent);
                     println!("{}├── identifier: {}", &current_indent, identifier);
                     self.print_recursive(expr, format!("{}└── ", &current_indent), true);
-                },
-                Statement::If => println!("{}IF", &indent),
+                }
+                Statement::If { expr, block } => {
+                    let current_indent = if is_last {
+                        indent
+                    } else {
+                        format!("{}", &indent)
+                    };
+                    println!("{}IF", &current_indent);
+                    self.print_recursive(expr, format!("{}├── ", &current_indent), false);
+                    println!("{}└── block", &current_indent);
+                    //self.print_recursive(block, format!("{}└── ", &current_indent), true);
+                }
                 Statement::Else => println!("{}ELSE", &indent),
                 Statement::Return => println!("{}RETURN", &indent),
+                Statement::None => println!("{}NONE", &indent),
             },
         }
     }
@@ -257,7 +267,7 @@ impl<'a> Parser<'a> {
         self.tokens = tokens;
     }
 
-    pub fn get_ast(&self) -> &Ast {
+    pub fn get_ast_ref(&self) -> &Ast {
         &self.ast
     }
 
@@ -280,9 +290,7 @@ impl<'a> Parser<'a> {
                 return Err(res.unwrap_err());
             }
 
-            // Go to next token, parse_{} functions should end
-            // on the last token of their respective statements
-            self.current_token += 1;
+            self.ast.root.push(res.unwrap());
         }
 
         Ok(&self.ast)
@@ -292,36 +300,16 @@ impl<'a> Parser<'a> {
         return &self.tokens.vec[self.current_token + 1];
     }
 
-    fn parse_token(&mut self) -> Result<(), String> {
-        // Used for both main and block statements
-        let parse_res = match self.tokens.vec[self.current_token] {
-            lexer::Token::Let => self.parse_alloc(true),
-            lexer::Token::Const => self.parse_alloc(false),
-            lexer::Token::Ident(s) => {
-                // check if next token is an assign operator
-                if self.peek() == &lexer::Token::Assign {
-                    self.parse_assign()
-                }
+    /// Starts at left brace and ends *after* right brace or semicolon if included
+    fn parse_block(&mut self) -> Result<Box<Ast>, String> {
+        if self.tokens.vec[self.current_token] != lexer::Token::LBrace {
+            return Err("[E009] Expected left brace at start of block".to_string());
+        }
+        self.current_token += 1;
 
-                // if not don't do anything
-                else {
-                    Ok(())
-                }
-            },
-            lexer::Token::Eof => Ok(()),
-            _ => Err(format!(
-                "[E001] Unexpected token: {:?}",
-                self.tokens.vec[self.current_token]
-            )),
-        };
+        let mut block = Box::new(Ast::new());
 
-        return parse_res;
-    }
-
-    fn parse_block(&mut self) -> Result<(), String> {
-        let mut block: Vec<AstNode> = Vec::new();
-
-        // iterate until we find a closing brace
+        // while not at right brace, self.parse_token()
         while self.tokens.vec[self.current_token] != lexer::Token::RBrace {
             let res = self.parse_token();
 
@@ -329,15 +317,53 @@ impl<'a> Parser<'a> {
                 return Err(res.unwrap_err());
             }
 
-            // Go to next token, parse_{} functions should end
-            // on the last token of their respective statements
+            block.root.push(res.unwrap());
+        }
+
+        if self.tokens.vec[self.current_token] != lexer::Token::RBrace {
+            return Err("[E008] Expected right brace after if block".to_string());
+        }
+
+        self.current_token += 1;
+
+        if self.tokens.vec[self.current_token] == lexer::Token::Semicolon {
             self.current_token += 1;
         }
 
-        Ok(())
+        Ok(block)
+    }
+
+    /// Should end after the last token of the statement, including the semicolon
+    fn parse_token(&mut self) -> Result<AstNode, String> {
+        // Used for both main and block statements
+        match self.tokens.vec[self.current_token] {
+            lexer::Token::Let => self.parse_alloc(true),
+            lexer::Token::Const => self.parse_alloc(false),
+            lexer::Token::Ident(s) => {
+                // check if next token is an assign operator
+                if self.peek() == &lexer::Token::Assign {
+                    self.parse_assign()
+                }
+                // if not don't do anything
+                else {
+                    Ok(AstNode::Statement(Statement::None))
+                }
+            }
+            lexer::Token::If => self.parse_if(),
+            lexer::Token::Eof => {
+                // End the parser by moving the current token to the end
+                self.current_token += 1;
+                Ok(AstNode::Statement(Statement::None))
+            },
+            _ => Err(format!(
+                "[E001] Unexpected token: {:?}",
+                self.tokens.vec[self.current_token]
+            )),
+        }
     }
 
     /// Current token should be the token before the first token of the expression
+    /// Ends at the token before the end_token
     fn parse_expr(
         &mut self,
         end_token: &Token,
@@ -429,7 +455,7 @@ impl<'a> Parser<'a> {
                     } else if token == lexer::Token::Eof {
                         return Err("[Esmth] Unexpected EOF".to_string());
                     }
-                    return Err("[Esmth] Expected operator".to_string());
+                    return Err(format!("[Esmth] Expected operator, got {:?}", token).to_string());
                 }
             };
 
@@ -459,7 +485,7 @@ impl<'a> Parser<'a> {
         return Ok(lhs);
     }
 
-    fn parse_assign(&mut self) -> Result<(), String> {
+    fn parse_assign(&mut self) -> Result<AstNode, String> {
         // start with identifier
         let ident: &str = match &self.tokens.vec[self.current_token] {
             lexer::Token::Ident(ident) => *ident,
@@ -475,18 +501,16 @@ impl<'a> Parser<'a> {
         let expr = self.parse_expr(&lexer::Token::Semicolon, None)?;
 
         // next token is semicolon
-        self.expect_semicolon()?;
+        self.expect_semicolon_and_next()?;
 
         // Add assign statement to ast
-        self.ast.root.push(AstNode::Statement(Statement::Assign {
+        Ok(AstNode::Statement(Statement::Assign {
             identifier: ident.to_owned(),
             expr,
-        }));
-
-        Ok(())
+        }))
     }
 
-    fn parse_alloc(&mut self, mut_: bool) -> Result<(), String> {
+    fn parse_alloc(&mut self, mut_: bool) -> Result<AstNode, String> {
         // start with let or const
         // ignore and move on
         self.current_token += 1;
@@ -511,9 +535,7 @@ impl<'a> Parser<'a> {
                     // TODO: check if type exists
                 }
                 lexer::Token::Type(type_) => {
-                    let type_index = crate::BUILT_IN_TYPES
-                        .iter()
-                        .position(|&t| t == *type_);
+                    let type_index = crate::BUILT_IN_TYPES.iter().position(|&t| t == *type_);
 
                     if type_index.is_some() {
                         crate::BUILT_IN_TYPES_DATA_TYPES[type_index.unwrap()]
@@ -546,25 +568,44 @@ impl<'a> Parser<'a> {
         }
 
         // Next token is semicolon
-        self.expect_semicolon()?;
+        self.expect_semicolon_and_next()?;
 
-        // Add let statement to ast
-        self.ast.root.push(AstNode::Statement(Statement::Alloc {
+        Ok(AstNode::Statement(Statement::Alloc {
             identifier: ident.to_owned(),
             type_: type_,
             expr,
             mut_: mut_,
-        }));
+        }))
+    }
 
-        Ok(())
+    fn parse_if(&mut self) -> Result<AstNode, String> {
+        // start with if
+        // ignore and move on
+        self.current_token += 1;
+
+        // next token is expression
+        // parse_expr requires the token before the expression
+        self.current_token -= 1;
+        let expr = self.parse_expr(&lexer::Token::LBrace, None)?;
+
+        // next token is block
+        self.current_token += 1;
+        let block = self.parse_block()?;
+
+        Ok(AstNode::Statement(Statement::If { expr, block }))
     }
 
     /// Expects the next token to be a semicolon, and moves to the next token
-    fn expect_semicolon(&mut self) -> Result<(), String> {
+    fn expect_semicolon_and_next(&mut self) -> Result<(), String> {
         self.current_token += 1;
         if self.tokens.vec[self.current_token] != lexer::Token::Semicolon {
-            return Err("[E004] Expected semicolon".to_string());
+            return Err(format!(
+                "[E004] Expected semicolon, got: {:?}",
+                self.tokens.vec[self.current_token]
+            )
+            .to_string());
         }
+        self.current_token += 1;
 
         Ok(())
     }

@@ -1,11 +1,14 @@
 const script: &str = r#"
-    let x: i32 = 12 + -3 * -4;
-    const y: str = "Hello, " + "world!";
+    // let x: i32 = 12 + -3 * -4;
+    // const y: str = "Hello, " + "world!";
+    let x: i32 = 512;
     let z: i32 = x + (12 % 5);
-    x = 512;
-    //y = "Can't mutate constants";
+
+    if x == 512 {
+        x = 12;
+    }
 "#;
-const debug: bool = false;
+const debug: bool = true;
 
 fn main() {
     let mut start = std::time::Instant::now();
@@ -15,14 +18,18 @@ fn main() {
     let tokens = l.tokenize();
 
     if tokens.is_err() {
-        println!("Error: {}", tokens.err().unwrap());
-        panic!("Lexer error")
+        let mut l2 = ahlang::Lexer::new();
+        l2.set_input(script);
+        _ = l2.tokenize();
+        println!("Tokens: \n");
+        println!("{}", *l2.get_tokens());
+        panic!("Lexer error: {}", tokens.err().unwrap());
     }
 
     let tokens = tokens.unwrap();
 
     if debug {
-        println!("Tokens: \n{:#?}", tokens);
+        println!("Tokens: \n{}", tokens);
     }
 
     let lexer_time = std::time::Instant::now() - start;
@@ -33,9 +40,15 @@ fn main() {
 
     let ast = p.parse();
     if ast.is_err() {
-        println!("Tokens: \n{:#?}\n", tokens);
-        println!("{}", p.get_ast());
-        panic!("Parser error");
+        println!("Tokens: \n");
+        
+        println!("{}", tokens);
+
+        let mut p2 = ahlang::Parser::new();
+        p2.set_tokens(&tokens);
+        _ = p2.parse();
+        println!("{}", p2.get_ast_ref());
+        panic!("Parser error: {}", &ast.err().unwrap());
     }
     let ast = ast.unwrap();
 

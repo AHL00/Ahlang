@@ -6,12 +6,18 @@
 - array
 - vector
 
+### Blocks
+```
+{
+    // This is a block
+}; // Semicolon is optional
+```
 
 ### Function
 ```
 fn main() -> () {
 
-};
+}
 ```
 
 ### Variable

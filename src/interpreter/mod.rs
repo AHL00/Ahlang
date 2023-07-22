@@ -1,4 +1,4 @@
-use crate::parser::{AstNode, Expression, Statement};
+use crate::parser::{AstNode, Expression, Statement, Ast};
 use crate::{parser, Data};
 use std::collections::HashMap;
 
@@ -59,16 +59,33 @@ impl Interpreter {
     //     self.vars.remove(identifier);
     // }
 
+    fn eval_block(&mut self, block: &Box<Ast>) -> Result<(), String> {
+        for node in &block.root {
+            let res = self.eval_statement(node);
+            if res.is_err() {
+                return Err(res.unwrap_err());
+            }
+        }
+
+        Ok(())
+    }
+
     // Recursive for nested statements
     fn eval_statement(&mut self, node: &AstNode) -> Result<(), String> {
         match node {
             AstNode::Statement(stmt) => match stmt {
                 Statement::Alloc { identifier, type_, expr, mut_ } => {
                     self.eval_stmt_alloc(identifier, type_, expr, *mut_)?;
-                }
+                },
                 Statement::Assign { identifier, expr } => {
                     self.eval_stmt_assign(identifier, expr)?;
-                }
+                },
+                Statement::If { expr, block } => {
+                    self.eval_stmt_if(expr, block)?;
+                },
+                Statement::None => {
+                    // do nothing
+                },
                 _ => {
                     return Err("[DEV] Statement type not implemented yet".to_string());
                 },
@@ -77,6 +94,24 @@ impl Interpreter {
                 return Err("Expected statement".to_string());
             }
         }
+        Ok(())
+    }
+
+    fn eval_stmt_if(&mut self, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
+        let data = self.eval_expression(expr)?;
+
+        match data {
+            Data::Bool(true) => {
+                self.eval_block(block)?;
+            },
+            Data::Bool(false) => {
+                // do nothing
+            },
+            _ => {
+                return Err(format!("Expression evaluates to {:?}, should be bool", data.get_type()).to_string());
+            }
+        }
+
         Ok(())
     }
 
@@ -175,19 +210,22 @@ impl Interpreter {
         match operator {
             crate::Operator::Plus => {
                 data = opers::addition(left, right)?;
-            }
+            },
             crate::Operator::Minus => {
                 data = opers::subtraction(left, right)?;
-            }
+            },
             crate::Operator::Asterisk => {
                 data = opers::multiplication(left, right)?;
-            }
+            },
             crate::Operator::Slash => {
                 data = opers::division(left, right)?;
-            }
+            },
             crate::Operator::Modulo => {
                 data = opers::modulo(left, right)?;
-            }
+            },
+            crate::Operator::Equals => {
+                data = opers::equals(left, right)?;
+            },
             _ => {
                 return Err("This operator can't be used as an infix".to_string());
             }

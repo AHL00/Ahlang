@@ -70,9 +70,20 @@ pub(crate) const KEYWORDS_TOKENS: [Token; 8] = [
     Token::Literal(Literal::Bool(false)),
 ];
 
-#[derive(Debug)]
 pub struct Tokens<'a> {
     pub(crate) vec: Vec<Token<'a>>,
+}
+
+impl<'a> std::fmt::Display for Tokens<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+
+        for i in 0..self.vec.len() {
+            s.push_str(&format!("{:3} > {:?}\n", i, self.vec[i]));
+        }
+
+        write!(f, "{}", s)
+    }
 }
 
 pub struct Lexer<'a> {
@@ -88,7 +99,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub(crate) fn get_tokens(&self) -> &Tokens {
+    pub fn get_tokens(&self) -> &Tokens {
         &self.tokens
     }
 

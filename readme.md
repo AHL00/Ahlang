@@ -5,7 +5,7 @@ Ahlang is a statically and strongly typed scripting language with a syntax *very
 [![Lines of code](https://tokei.rs/b1/github/AHL00/Ahlang?category=code)](https://github.com/AHL00/Ahlang)
 
 ## Features
-- [ ] Static typing
+- [X] Static typing
 - [ ] Object oriented programming
 - [X] REPL
 
@@ -32,6 +32,7 @@ fn example(y: i32) -> str {
 ## REPL
 - [X] Multiline input
 - [X] History
+- [X] Variable inspection
 
 ![REPL](/images/repl.png)
 

@@ -2,6 +2,7 @@ pub mod interpreter;
 pub mod lexer;
 pub mod parser;
 
+
 pub use interpreter::Interpreter;
 pub use lexer::Lexer;
 pub use parser::Parser;
@@ -54,6 +55,14 @@ impl ReplEngine {
         let interpreter = Interpreter::new();
 
         ReplEngine { interpreter }
+    }
+
+    pub fn get_vars(&self) -> Vec<(String, Data)> {
+        self.interpreter
+            .vars
+            .iter()
+            .map(|(k, v)| (k.clone(), v.data.clone()))
+            .collect()
     }
 
     pub fn eval(&mut self, line: &str) -> Result<(), String> {

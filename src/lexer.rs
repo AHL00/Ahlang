@@ -87,6 +87,8 @@ impl<'a> std::fmt::Display for Tokens<'a> {
     }
 }
 
+// TODO: Bug, identifiers can't start with a digit, can't include _
+
 pub struct Lexer<'a> {
     input: &'a str,
     tokens: Tokens<'a>,

@@ -80,6 +80,6 @@ fn main() {
     println!();
 
 
-    println!("Vars: {:#?}", i.vars);
+    // println!("Vars: {:#?}", i.vars);
 
 }

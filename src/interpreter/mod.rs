@@ -5,15 +5,14 @@ use std::collections::HashMap;
 mod opers;
 
 #[derive(Debug)]
-pub struct Var {
-    data: Data,
-    type_: crate::DataType,
-    mut_: bool,
+pub(crate) struct Var {
+    pub data: Data,
+    pub type_: crate::DataType,
+    pub mut_: bool,
 }
 
 pub struct Interpreter {
-    // TODO: Make vars private
-    pub vars: HashMap<String, Var>,
+    pub(crate) vars: HashMap<String, Var>,
 }
 
 impl Interpreter {

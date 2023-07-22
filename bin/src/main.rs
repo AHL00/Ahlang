@@ -105,6 +105,7 @@ fn print_continuation_start() {
     print!("\x1B[32m{}\x1B[0m", continuation_line);
 }
 
+// TODO: Paste, move left and right, tab
 fn repl() {
     let mut engine = ReplEngine::new();
 
@@ -183,8 +184,23 @@ fn repl() {
                                 next_line_start();
                                 print!("- Ctrl + H for help");
                                 next_line_start();
-                                print!("- To write multiline statements, press enter without ending the line in a semicolon.");
+                                print!("- Ctrl + T to inspect variables");
                                 next_line_start();
+                                print!("- To write multiline statements, press enter before ending the statement.");
+                                next_line_start();
+                                break;
+                            },
+                            termion::event::Key::Ctrl('t') => {
+                                next_line_start();
+                                print!("");
+                                print!("\x1B[33;4m! Variables:\x1B[0m");
+                                next_line_start();
+                                
+                                // Assuming you have an `engine` instance of `YourEngineType`
+                                for (k, v) in engine.get_vars() {
+                                    print!("\x1B[33m {}: \x1B[33;2m{:?}\x1B[0m", k, v);
+                                    next_line_start();
+                                }
                                 break;
                             },
                             termion::event::Key::Backspace => {

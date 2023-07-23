@@ -240,8 +240,10 @@ impl Ast {
                     };
                     println!("{}IF", &current_indent);
                     self.print_recursive(expr, format!("{}├── ", &current_indent), false);
-                    println!("{}└── block", &current_indent);
-                    //self.print_recursive(block, format!("{}└── ", &current_indent), true);
+                    println!("{}└── [BLOCK]", &current_indent);
+                    for node in &block.root {
+                        self.print_recursive(node, format!("{}    ", &current_indent), false);
+                    }
                 }
                 Statement::While { expr, block } => {
                     let current_indent = if is_last {
@@ -251,8 +253,10 @@ impl Ast {
                     };
                     println!("{}WHILE", &current_indent);
                     self.print_recursive(expr, format!("{}├── ", &current_indent), false);
-                    println!("{}└── block", &current_indent);
-                    //self.print_recursive(block, format!("{}└── ", &current_indent), true);
+                    println!("{}└── [BLOCK]", &current_indent);
+                    for node in &block.root {
+                        self.print_recursive(node, format!("{}    ", &current_indent), false);
+                    }
                 }
                 Statement::Else => println!("{}ELSE", &indent),
                 Statement::Return => println!("{}RETURN", &indent),
@@ -263,7 +267,7 @@ impl Ast {
 }
 
 impl std::fmt::Display for Ast {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for node in &self.root {
             self.print_recursive(node, String::from(""), false);
         }
@@ -366,7 +370,7 @@ impl<'a> Parser<'a> {
             lexer::Token::Fn => self.parse_fn_def(),
             lexer::Token::Let => self.parse_alloc(true),
             lexer::Token::Const => self.parse_alloc(false),
-            lexer::Token::Ident(s) => {
+            lexer::Token::Ident(_) => {
                 // check if next token is an assign operator
                 if self.peek() == &lexer::Token::Assign {
                     self.parse_assign()
@@ -621,7 +625,7 @@ impl<'a> Parser<'a> {
         if self.tokens.vec[self.current_token] == lexer::Token::Colon {
             self.current_token += 1;
             type_ = match &self.tokens.vec[self.current_token] {
-                lexer::Token::Ident(type_) => {
+                lexer::Token::Ident(_) => {
                     todo!("Custom types are not yet supported");
                     // TODO: check if type exists
                 }

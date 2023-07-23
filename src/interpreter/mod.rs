@@ -127,7 +127,7 @@ impl Interpreter {
     fn eval_stmt_while(&mut self, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
         let mut data = self.eval_expression(expr)?;
 
-        while let Data::Bool { val } = data {
+        while let Data::Bool { val: true } = data {
             self.eval_block(block)?;
             data = self.eval_expression(expr)?;
         }

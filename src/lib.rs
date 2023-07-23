@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused_labels)]
+
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
@@ -19,30 +22,27 @@ pub(crate) const BUILT_IN_TYPES_DATA_TYPES: [DataType; 5] = [
 
 pub(crate) const BUILT_IN_FUNCS: [&str; 1] = ["print"];
 
-pub struct Engine<'a> {
-    pub lexer: Lexer<'a>,
-    pub parser: Parser<'a>,
+pub struct Engine {
     pub interpreter: Interpreter,
 }
 
-impl<'a> Engine<'a> {
-    pub fn new() -> Engine<'a> {
-        let lexer = Lexer::new();
-        let parser = Parser::new();
+impl Engine {
+    pub fn new() -> Engine {
         let interpreter = Interpreter::new();
 
         Engine {
-            lexer,
-            parser,
             interpreter,
         }
     }
 
-    pub fn run(&'a mut self, script: &'a str) -> Result<(), String> {
-        self.lexer.set_input(script);
-        let tokens = self.lexer.tokenize()?;
-        self.parser.set_tokens(tokens);
-        let ast = self.parser.parse()?;
+    pub fn run(&mut self, script: &str) -> Result<(), String> {
+        let mut lexer = Lexer::new();
+        let mut parser = Parser::new();
+
+        lexer.set_input(script);
+        let tokens = lexer.tokenize()?;
+        parser.set_tokens(tokens);
+        let ast = parser.parse()?;
         self.interpreter.run(ast)
     }
 }
@@ -97,7 +97,7 @@ trait Format {
 }
 
 // Exposed to allow data in and out of the interpreter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Data {
     Int32 {
         val: i32,

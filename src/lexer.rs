@@ -26,7 +26,7 @@ pub(crate) enum Token<'a> {
     Type(&'a str),
 
     // Built-in functions
-    Built_in_func(&'a str),
+    BuiltInFunc(&'a str),
 
     // Operators
     Assign,
@@ -128,7 +128,6 @@ impl<'a> Lexer<'a> {
         // set token literal to slice of input str
         let mut char_iter = self.input.char_indices().peekable();
 
-        #[allow(unused_labels)]
         'tokenizer: loop {
             // Get the next character of the input
             let i = char_iter.next();
@@ -156,7 +155,7 @@ impl<'a> Lexer<'a> {
                     let mut next_char = char_iter.next();
 
                     while next_char.is_some() {
-                        let (i, c) = next_char.unwrap();
+                        let (_, c) = next_char.unwrap();
 
                         // If new line character found, end consuming comment
                         if c == '\n' {
@@ -182,7 +181,7 @@ impl<'a> Lexer<'a> {
 
                 // Consume the characters inside the string literal
                 while next_char.is_some() {
-                    let (i, c) = next_char.unwrap();
+                    let (_, c) = next_char.unwrap();
 
                     // If closing double quote found, end of string literal
                     if c == '"' {
@@ -211,7 +210,7 @@ impl<'a> Lexer<'a> {
                 let mut char_count = 1;
 
                 while next_char.is_some() {
-                    let (i, c) = next_char.unwrap();
+                    let (_, c) = next_char.unwrap();
 
                     if c == '\'' {
                         break;
@@ -232,7 +231,7 @@ impl<'a> Lexer<'a> {
             }
 
             // Peek
-            let mut peek_opt = char_iter.peek();
+            let peek_opt = char_iter.peek();
             let mut peek = '\0';
             if peek_opt.is_some() {
                 peek = peek_opt.unwrap().1;
@@ -339,7 +338,7 @@ impl<'a> Lexer<'a> {
                     continue;
                 } else if crate::BUILT_IN_FUNCS.contains(&literal) {
                     // If the literal is a built-in function, we add a function token
-                    self.tokens.vec.push(Token::Built_in_func(literal));
+                    self.tokens.vec.push(Token::BuiltInFunc(literal));
 
                     continue;
                 } else {
@@ -458,7 +457,7 @@ impl<'a> Lexer<'a> {
                     | Token::RParen
                     | Token::RSquare
                     | Token::RBrace
-                    | Token::Built_in_func(_)
+                    | Token::BuiltInFunc(_)
                     | Token::Function(_)
             )
         {

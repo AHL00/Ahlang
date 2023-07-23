@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, io};
+use std::io;
 
 use ahlang::*;
 use termion::{raw::IntoRawMode, input::TermRead};
@@ -65,17 +65,17 @@ fn main() {
     };
 }
 
-fn next_line() {
-    print!("\n");
-}
+// fn next_line() {
+//     print!("\n");
+// }
 
 fn line_start() {
     print!("\x1B[0G");
 }
 
-fn line_end() {
-    print!("{}", termion::cursor::Right(2048));
-}
+// fn line_end() {
+//     print!("{}", termion::cursor::Right(2048));
+// }
 
 fn move_right(n: u16) {
     print!("{}", termion::cursor::Right(n));
@@ -93,16 +93,16 @@ fn last_line() {
     print!("\x1B[1F");
 }
 
-
-const continuation_line: &str = "└─ ";
-const start_line: &str = ">> ";
+/// Continuation line
+const CONT_LINE: &str = "└─ ";
+const START_LINE: &str = ">> ";
 
 fn print_line_start() {
-    print!("\x1B[32m{}\x1B[0m", start_line);
+    print!("\x1B[32m{}\x1B[0m", START_LINE);
 }
 
 fn print_continuation_start() {
-    print!("\x1B[32m{}\x1B[0m", continuation_line);
+    print!("\x1B[32m{}\x1B[0m", CONT_LINE);
 }
 
 // TODO: Paste, move left and right, tab
@@ -110,6 +110,7 @@ fn repl() {
     let mut engine = ReplEngine::new();
 
     let mut history_stack: Vec<String> = Vec::new();
+    #[allow(unused_assignments)]
     let mut history_ptr = 0;
 
     println!("\x1B[33;1;4;5mAhlang REPL v{}\x1B[0m", env!("CARGO_PKG_VERSION"));
@@ -220,9 +221,9 @@ fn repl() {
                                         let mut chars_on_line = input.len() - line_start_locs[line_start_locs.len() - 1];
                                         // account for line start
                                         if line_start_locs.len() == 1 {
-                                            chars_on_line += start_line.chars().count();
+                                            chars_on_line += START_LINE.chars().count();
                                         } else {
-                                            chars_on_line += continuation_line.chars().count();
+                                            chars_on_line += CONT_LINE.chars().count();
                                         }
 
                                         move_right(chars_on_line as u16);
@@ -401,59 +402,5 @@ fn repl() {
         }
 
         line_start();
-    }
-}
-
-
-struct Stack<T> {
-    deque: VecDeque<T>,
-    size: usize,
-}
-
-impl<T> Stack<T> {
-    fn new(size: usize) -> Stack<T> {
-        Stack {
-            deque: VecDeque::with_capacity(size),
-            size,
-        }
-    }
-
-    fn push(&mut self, item: T) {
-        if self.deque.len() == self.size {
-            self.deque.pop_front();
-        }
-
-        self.deque.push_back(item);
-    }
-
-    fn get(&self, index: usize) -> Option<&T> {
-        self.deque.get(index)
-    }
-
-    fn pop(&mut self) -> Option<T> {
-        self.deque.pop_back()
-    }
-
-    fn last(&self) -> Option<&T> {
-        self.deque.back()
-    }
-
-    fn len(&self) -> usize {
-        self.deque.len()
-    }
-}
-
-
-impl<T> std::ops::Index<usize> for Stack<T> {
-    type Output = T;
-
-    fn index(&self, index: usize) -> &T {
-        &self.deque[index]
-    }
-}
-
-impl<T> std::ops::IndexMut<usize> for Stack<T> {
-    fn index_mut(&mut self, index: usize) -> &mut T {
-        self.deque.index_mut(index)
     }
 }

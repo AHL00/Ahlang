@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 fn main() {
     println!("Not meant to be run as a binary");
 }

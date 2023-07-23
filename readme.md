@@ -41,7 +41,14 @@ fn example(y: i32) -> str {
 - [ ] Parser
   - [X] Pratt parser for expressions
   - [ ] Implement all statement types
-- [ ] Abstract syntax tree walking interpreter
+    - [X]  `if`
+    - [X] `while`
+    - [X] `let`
+- [ ] Interpreter
+  - [X] Basic framework
+  - [X] Variables
+  - [ ] Functions
+  - [ ] Structs
 - [ ] Standard library
 - [ ] Transition to bytecode interpreter?
 

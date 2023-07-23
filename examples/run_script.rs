@@ -1,3 +1,7 @@
+fn main() {
+    println!("Not meant to be run as a binary");
+}
+
 pub fn run(script: &str, debug: bool) {
     let mut start = std::time::Instant::now();
 
@@ -28,16 +32,22 @@ pub fn run(script: &str, debug: bool) {
 
     let ast = p.parse();
     if ast.is_err() {
+        if !debug {
         println!("Tokens: \n");
-        
         println!("{}", tokens);
+        }
+        
 
         let mut p2 = ahlang::Parser::new();
         p2.set_tokens(&tokens);
         _ = p2.parse();
-        println!("{}", p2.get_ast_ref());
-        panic!("Parser error: {}", &ast.err().unwrap());
+
+        println!("AST: \n{}", p2.get_ast_ref());
+
+        println!("Parser error: {}", &ast.unwrap_err());
+        return;
     }
+
     let ast = ast.unwrap();
 
     if debug {
@@ -46,10 +56,10 @@ pub fn run(script: &str, debug: bool) {
 
     let parser_time = std::time::Instant::now() - start;
     start = std::time::Instant::now();
-    
+
     let mut i = ahlang::Interpreter::new();
     match i.run(ast) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => {
             println!("Error: {}", e);
             return;
@@ -64,6 +74,6 @@ pub fn run(script: &str, debug: bool) {
     println!("Parser time: {:?}", parser_time);
     println!("Run time: {:?}", run_time);
     println!(">> Total time: {:?}", lexer_time + parser_time + run_time);
-    
+
     println!();
 }

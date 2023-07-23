@@ -21,7 +21,7 @@ pub(crate) enum Token<'a> {
     // Identifiers / literals / funcs
     Ident(&'a str),
     Literal(Literal<'a>),
-    Func(&'a str),
+    Function(&'a str),
 
     Type(&'a str),
 
@@ -130,30 +130,35 @@ impl<'a> Lexer<'a> {
 
         #[allow(unused_labels)]
         'tokenizer: loop {
+            // Get the next character of the input
             let i = char_iter.next();
 
+            // If no more characters, end the loop
             if i.is_none() {
                 break;
             }
 
             let (i, current_char) = i.unwrap();
 
+            // Ignore whitespace characters
             if current_char.is_whitespace() {
                 continue;
             }
 
+            // Ignore comments (contents after //)
             if current_char == '/' {
                 let peek = char_iter.peek();
                 if peek.is_none() {
                     return Err("Unexpected EOF".to_string());
                 }
                 if peek.unwrap().1 == '/' {
-                    // skip comment
+                    // Consuming all characters until the end of the line (end of comment)
                     let mut next_char = char_iter.next();
 
                     while next_char.is_some() {
                         let (i, c) = next_char.unwrap();
 
+                        // If new line character found, end consuming comment
                         if c == '\n' {
                             break;
                         }
@@ -165,8 +170,8 @@ impl<'a> Lexer<'a> {
                 }
             }
 
+            // Handle string literals within ""
             if current_char == '"' {
-                // string literal
                 let mut next_char = char_iter.next();
 
                 if next_char.is_none() {
@@ -175,9 +180,11 @@ impl<'a> Lexer<'a> {
 
                 let mut char_count = 1;
 
+                // Consume the characters inside the string literal
                 while next_char.is_some() {
                     let (i, c) = next_char.unwrap();
 
+                    // If closing double quote found, end of string literal
                     if c == '"' {
                         break;
                     }
@@ -186,10 +193,7 @@ impl<'a> Lexer<'a> {
                     next_char = char_iter.next();
                 }
 
-                if next_char.is_none() {
-                    return Err("Unexpected EOF".to_string());
-                }
-
+                // Add the string literal to the token list
                 self.tokens.vec.push(Token::Literal(Literal::Str(
                     &self.input[i + 1..i + char_count],
                 )));
@@ -227,107 +231,131 @@ impl<'a> Lexer<'a> {
                 continue;
             }
 
+            // Peek
+            let mut peek_opt = char_iter.peek();
+            let mut peek = '\0';
+            if peek_opt.is_some() {
+                peek = peek_opt.unwrap().1;
+            }
+
             if current_char.is_digit(10) {
-                // check for int/float literal
+                // If the current character is a digit, we start processing a number literal
                 let mut next_char_digit = true;
                 let mut char_count = 1;
                 let mut float = false;
                 let mut decimal_included = false;
-
+            
                 while next_char_digit {
+                    // We keep processing characters as long as they are digits or special number characters
                     let next_char = char_iter.peek();
-
+            
                     if next_char.is_none() {
+                        // If there are no more characters, we break the loop
                         break;
                     }
-
+            
                     let next_char = next_char.unwrap().1;
-
+            
                     if next_char == '.' {
+                        // If the character is a dot, we are processing a float
                         if decimal_included {
+                            // If we have already included a decimal point, this is an error
                             return Err(format!(
                                 "Invalid float literal: {}",
                                 &self.input[i..i + char_count + 1]
                             ));
                         }
-
+            
                         float = true;
                         decimal_included = true;
-
+            
                         char_count += 1;
                         char_iter.next();
                     } else if next_char == '_' {
+                        // If the character is an underscore, we ignore it (it's allowed in number literals)
                         char_count += 1;
                         char_iter.next();
                     } else if next_char.is_digit(10) {
+                        // If the character is a digit, we continue processing
                         char_count += 1;
                         char_iter.next();
                     } else {
+                        // If the character is not a digit, dot, or underscore, we stop processing
                         next_char_digit = false;
                     }
                 }
-
+            
                 if float {
+                    // If we processed a float, we add a float token
                     self.tokens.vec.push(Token::Literal(Literal::Float(
                         &self.input[i..i + char_count],
                     )));
                 } else {
+                    // If we processed an integer, we add an integer token
                     self.tokens
                         .vec
                         .push(Token::Literal(Literal::Int(&self.input[i..i + char_count])));
                 }
-
+            
                 continue;
             } else if current_char.is_alphabetic() {
-                // match keyword or identifier
-                // identifiers can not start with a digit
+                // If the current character is alphabetic, we start processing an identifier or keyword
                 let mut next_char_alhpanum = true;
                 let mut char_count = 1;
-
+            
                 while next_char_alhpanum {
+                    // We keep processing characters as long as they are alphanumeric
                     let next_char = char_iter.peek();
-
+            
                     if next_char.is_none() {
+                        // If there are no more characters, we break the loop
                         break;
                     }
-
+            
                     let next_char = next_char.unwrap().1;
-
+            
                     if next_char.is_alphanumeric() {
+                        // If the character is alphanumeric, we continue processing
                         char_count += 1;
                         char_iter.next();
                     } else {
+                        // If the character is not alphanumeric, we stop processing
                         next_char_alhpanum = false;
                     }
                 }
-
+            
                 let literal = &self.input[i..i + char_count];
-
+            
                 let found_kwd = KEYWORDS.iter().position(|&s| s == literal);
                 if found_kwd.is_some() {
+                    // If the literal is a keyword, we add a keyword token
                     self.tokens
                         .vec
                         .push(KEYWORDS_TOKENS[found_kwd.unwrap()].clone());
                     continue;
                 } else if crate::BUILT_IN_TYPES.contains(&literal) {
+                    // If the literal is a built-in type, we add a type token
                     self.tokens.vec.push(Token::Type(literal));
                     continue;
                 } else if crate::BUILT_IN_FUNCS.contains(&literal) {
+                    // If the literal is a built-in function, we add a function token
                     self.tokens.vec.push(Token::Built_in_func(literal));
+
                     continue;
                 } else {
+                    // Handled in parser now
+                    // // If the literal is not a keyword, built-in type, or built-in function, it's an identifier
+                    // if peek == '(' {
+                    //     // If the next character is an open parenthesis, this is a function call
+                    //     self.tokens.vec.push(Token::Function(literal));
+                    //     continue;
+                    // }
+            
+                    // Otherwise, it's a variable or other identifier
                     self.tokens.vec.push(Token::Ident(literal));
                     continue;
                 }
-            }
-
-            let peek_opt = char_iter.peek();
-            // EOF char
-            let mut peek = ' ';
-
-            if peek_opt.is_some() {
-                peek = peek_opt.unwrap().1;
-            }
+            }            
 
             self.tokens.vec.push(match (current_char, peek) {
                 ('+', _) => {
@@ -431,7 +459,7 @@ impl<'a> Lexer<'a> {
                     | Token::RSquare
                     | Token::RBrace
                     | Token::Built_in_func(_)
-                    | Token::Func(_)
+                    | Token::Function(_)
             )
         {
             return true;

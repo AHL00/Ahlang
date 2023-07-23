@@ -40,6 +40,9 @@ impl<'a> Literal {
                     "Bool literals should be set directly as lexer::Literal::Bool is of type bool"
                 )
             }
+            crate::DataType::Empty => {
+                panic!("Empty literals should be set directly as lexer::Literal::Empty is of type ()")
+            }
         }
     }
 }
@@ -123,10 +126,10 @@ pub(crate) enum Expression {
         operator: crate::Operator,
         right: Box<AstNode>,
     },
-    Call {
+    FunctionCall {
         // TODO: Optimization: Lexer immediately registers functions, replace string with function "pointer"
         function: String,
-        arguments: Vec<AstNode>,
+        arguments: Vec<Box<AstNode>>,
     },
 }
 
@@ -177,7 +180,7 @@ impl Ast {
                     println!("{}├── op: {:?}", &indent, operator);
                     self.print_recursive(right, format!("{}│   ", &indent), true);
                 }
-                Expression::Call {
+                Expression::FunctionCall {
                     function,
                     arguments,
                 } => {
@@ -231,7 +234,7 @@ impl Ast {
                     self.print_recursive(expr, format!("{}├── ", &current_indent), false);
                     println!("{}└── block", &current_indent);
                     //self.print_recursive(block, format!("{}└── ", &current_indent), true);
-                },
+                }
                 Statement::While { expr, block } => {
                     let current_indent = if is_last {
                         indent
@@ -242,7 +245,7 @@ impl Ast {
                     self.print_recursive(expr, format!("{}├── ", &current_indent), false);
                     println!("{}└── block", &current_indent);
                     //self.print_recursive(block, format!("{}└── ", &current_indent), true);
-                },
+                }
                 Statement::Else => println!("{}ELSE", &indent),
                 Statement::Return => println!("{}RETURN", &indent),
                 Statement::None => println!("{}NONE", &indent),
@@ -352,6 +355,7 @@ impl<'a> Parser<'a> {
     fn parse_token(&mut self) -> Result<AstNode, String> {
         // Used for both main and block statements
         match self.tokens.vec[self.current_token] {
+            lexer::Token::Fn => self.parse_fn_def(),
             lexer::Token::Let => self.parse_alloc(true),
             lexer::Token::Const => self.parse_alloc(false),
             lexer::Token::Ident(s) => {
@@ -371,7 +375,7 @@ impl<'a> Parser<'a> {
                 // End the parser by moving the current token to the end
                 self.current_token += 1;
                 Ok(AstNode::Statement(Statement::None))
-            },
+            }
             _ => Err(format!(
                 "[E001] Unexpected token: {:?}",
                 self.tokens.vec[self.current_token]
@@ -406,9 +410,32 @@ impl<'a> Parser<'a> {
             }
             _ => {
                 lhs = match &self.tokens.vec[self.current_token] {
-                    lexer::Token::Ident(ident) => Box::new(AstNode::Expression(
-                        Expression::VarIdentifier((*ident).to_owned()),
-                    )),
+                    lexer::Token::Ident(ident) => {
+                        let peek = self.peek();
+                        if peek == &lexer::Token::LParen {
+                            // Function call
+                            self.current_token += 1;
+                            let mut arguments: Vec<Box<AstNode>> = Vec::new();
+
+                            loop {
+                                self.current_token += 1;
+                                if self.tokens.vec[self.current_token] == lexer::Token::RParen {
+                                    break;
+                                }
+                                let expr = self.parse_expr(&lexer::Token::RParen, None)?;
+                                arguments.push(expr);
+                            }
+
+                            Box::new(AstNode::Expression(Expression::FunctionCall {
+                                function: (*ident).to_owned(),
+                                arguments,
+                            }))
+                        } else {
+                            Box::new(AstNode::Expression(Expression::VarIdentifier(
+                                (*ident).to_owned(),
+                            )))
+                        }
+                    },
                     lexer::Token::Literal(lit) => {
                         use lexer::Literal as LexerLiteral;
 
@@ -500,6 +527,45 @@ impl<'a> Parser<'a> {
         }
 
         return Ok(lhs);
+    }
+
+    fn parse_fn_def(&mut self) -> Result<AstNode, String> {
+        // start with fn
+        // ignore and move on
+        self.current_token += 1;
+
+        // next token is identifier
+        let ident: String = match &self.tokens.vec[self.current_token] {
+            lexer::Token::Ident(ident) => (*ident).to_owned(),
+            _ => {
+                return Err("[E010] Expected identifier after fn".to_string());
+            }
+        };
+
+        // next token is left paren
+        self.current_token += 1;
+        if self.tokens.vec[self.current_token] != lexer::Token::LParen {
+            return Err("[E005] Expected left paren after function identifier".to_string());
+        }
+
+        // next token is right paren
+        self.current_token += 1;
+        if self.tokens.vec[self.current_token] != lexer::Token::RParen {
+            return Err("[E006] Expected right paren".to_string());
+        }
+
+        // next token is left brace
+        self.current_token += 1;
+        if self.tokens.vec[self.current_token] != lexer::Token::LBrace {
+            return Err("[E007] Expected left brace after right paren".to_string());
+        }
+
+        // parse block
+        let block = self.parse_block()?;
+
+        // finishes after } or ;
+
+        Ok(AstNode::Statement(Statement::None))
     }
 
     fn parse_assign(&mut self) -> Result<AstNode, String> {

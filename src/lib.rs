@@ -1,6 +1,7 @@
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
+mod stdlib;
 
 
 pub use interpreter::Interpreter;
@@ -79,6 +80,22 @@ impl ReplEngine {
     }
 }
 
+// NOTE: use get_type() for now, if performance becomes an issue, redesign data enum to be wrapped in a struct that contains the data type as well 
+
+// pub struct FunctionReturn {
+//     pub data: Data,
+//     pub data_type: DataType,
+// }
+
+// pub struct FunctionArg {
+//     pub name: String,
+//     pub data_type: DataType,
+// }
+
+trait to_str {
+    fn to_str(&self) -> String;
+}
+
 // Exposed to allow data in and out of the interpreter
 #[derive(Debug, Clone)]
 pub enum Data {
@@ -87,6 +104,7 @@ pub enum Data {
     Str(Box<String>),
     Char(char),
     Bool(bool),
+    Empty,
 }
 
 impl Data {
@@ -97,6 +115,7 @@ impl Data {
             Data::Str(_) => DataType::Str,
             Data::Char(_) => DataType::Char,
             Data::Bool(_) => DataType::Bool,
+            Data::Empty => DataType::Empty,
         }
     }
 
@@ -108,6 +127,7 @@ impl Data {
             Data::Str(s) => Box::new(s.clone()),
             Data::Char(c) => Box::new(c.clone()),
             Data::Bool(b) => Box::new(*b),
+            Data::Empty => Box::new(()),
         }
     }
 }
@@ -121,6 +141,7 @@ pub enum DataType {
     Str,
     Char,
     Bool,
+    Empty,
 }
 
 impl DataType {
@@ -142,6 +163,7 @@ impl DataType {
             DataType::Str => "str",
             DataType::Char => "char",
             DataType::Bool => "bool",
+            DataType::Empty => "()",
         }
     }
 }

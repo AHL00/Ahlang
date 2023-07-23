@@ -76,4 +76,9 @@ pub fn run(script: &str, debug: bool) {
     println!(">> Total time: {:?}", lexer_time + parser_time + run_time);
 
     println!();
+
+    println!("Variables: ");
+    for (k, v) in i.dbg_get_vars().iter() {
+        println!(" > {}: {:?}", k, v);
+    }
 }

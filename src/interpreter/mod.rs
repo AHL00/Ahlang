@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 mod opers;
 
+// NOTE: Consider storing mut_ state seperately in a "compressed" bool array
 #[derive(Debug)]
 pub(crate) struct Var {
     pub data: Data,
@@ -39,6 +40,13 @@ impl Interpreter {
 
     pub fn reset(&mut self) {
         self.vars.clear();
+    }
+
+    pub fn dbg_get_vars(&self) -> Vec<(String, Data)> {
+        self.vars
+            .iter()
+            .map(|(k, v)| (k.clone(), v.data.clone()))
+            .collect()
     }
 
     #[inline(always)]
@@ -103,11 +111,10 @@ impl Interpreter {
         let data = self.eval_expression(expr)?;
 
         match data {
-            Data::Bool(true) => {
-                self.eval_block(block)?;
-            },
-            Data::Bool(false) => {
-                // do nothing
+            Data::Bool { val: data } => {
+                if data {
+                    self.eval_block(block)?;
+                }
             },
             _ => {
                 return Err(format!("Expression evaluates to {:?}, should be bool", data.get_type()).to_string());
@@ -120,7 +127,7 @@ impl Interpreter {
     fn eval_stmt_while(&mut self, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
         let mut data = self.eval_expression(expr)?;
 
-        while let Data::Bool(true) = data {
+        while let Data::Bool { val } = data {
             self.eval_block(block)?;
             data = self.eval_expression(expr)?;
         }
@@ -166,7 +173,7 @@ impl Interpreter {
         // allocate variable
         self.allocate_var(identifier, Var {
             data,
-            type_: type_.clone(),
+            type_: *type_,
             mut_,
         });
 
@@ -180,7 +187,11 @@ impl Interpreter {
         match node {
             AstNode::Expression(expr) => match expr {
                 Expression::Literal(literal) => {
-                    return literal.data.clone().ok_or("Literal has no data".to_owned());
+                    if literal.data.is_empty() {
+                        panic!("Literal data is empty");
+                    } else {
+                        return Ok(literal.data.clone());
+                    }
                 }
                 Expression::Prefix { operator, right } => {
                     return self.eval_prefix_expr(operator, right);

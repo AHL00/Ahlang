@@ -4,9 +4,7 @@ static SCRIPT: &str = r#"
 
 let x: i32 = 12;
 
-fn main() {
-    print("Hello, world!");
-}
+
 "#;
 
 fn main() {

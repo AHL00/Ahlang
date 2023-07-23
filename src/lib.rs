@@ -92,45 +92,59 @@ impl ReplEngine {
 //     pub data_type: DataType,
 // }
 
-trait to_str {
-    fn to_str(&self) -> String;
+trait Format {
+    fn format(&self) -> String;
 }
 
 // Exposed to allow data in and out of the interpreter
 #[derive(Debug, Clone)]
 pub enum Data {
-    Int32(i32),
-    Float64(f64),
-    Str(Box<String>),
-    Char(char),
-    Bool(bool),
-    Empty,
+    Int32 {
+        val: i32,
+    },
+    Float64 {
+        val: f64,
+    },
+    Str {
+        // Box to reduce mem size of enum
+        val: Box<String>,
+    },
+    Char {
+        val: char,
+    },
+    Bool {
+        val: bool,
+    },
+    // NOTE:
+    // Class {
+    //     data: Vec<Data>, // store the index of the vars in a hashmap somewhere 
+    //     class_type: String, // store the member functions in a hashmap somewhere
+    // },
+    Empty {
+
+    },
 }
 
 impl Data {
-    pub fn get_type(&self) -> DataType {
+    fn get_type(&self) -> DataType {
         match self {
-            Data::Int32(_) => DataType::Int32,
-            Data::Float64(_) => DataType::Float64,
-            Data::Str(_) => DataType::Str,
-            Data::Char(_) => DataType::Char,
-            Data::Bool(_) => DataType::Bool,
-            Data::Empty => DataType::Empty,
+            Data::Int32 { .. } => DataType::Int32,
+            Data::Float64 { .. } => DataType::Float64,
+            Data::Str { .. } => DataType::Str,
+            Data::Char { .. } => DataType::Char,
+            Data::Bool { .. } => DataType::Bool,
+            Data::Empty { .. } => DataType::Empty,
         }
     }
 
-    /// Clones the data into a Box<dyn Any>, helpful for interfacing between the interpreter and Rust
-    pub fn to_rust_type(&self) -> Box<dyn std::any::Any> {
+    fn is_empty(&self) -> bool {
         match self {
-            Data::Int32(i) => Box::new(*i),
-            Data::Float64(f) => Box::new(*f),
-            Data::Str(s) => Box::new(s.clone()),
-            Data::Char(c) => Box::new(c.clone()),
-            Data::Bool(b) => Box::new(*b),
-            Data::Empty => Box::new(()),
+            Data::Empty { .. } => true,
+            _ => false,
         }
     }
 }
+
 
 // TODO: Remove and use Data(_) instead?
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -152,6 +166,7 @@ impl DataType {
             "str" => Some(DataType::Str),
             "char" => Some(DataType::Char),
             "bool" => Some(DataType::Bool),
+            "()" => Some(DataType::Empty),
             _ => None,
         }
     }

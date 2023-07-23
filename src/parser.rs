@@ -1,16 +1,20 @@
 use crate::lexer::{self, Token};
+use crate::Data;
 
 // TODO: Proper errors and code cleanup
 
 #[derive(Debug)]
 pub(crate) struct Literal {
-    pub data: Option<crate::Data>,
+    pub data: Data,
     pub type_: crate::DataType,
 }
 
 impl Literal {
     pub fn new(type_: crate::DataType) -> Literal {
-        Literal { data: None, type_ }
+        Literal {
+            data: Data::Empty {},
+            type_,
+        }
     }
 }
 
@@ -18,22 +22,24 @@ impl<'a> Literal {
     pub fn set_data_from_str(&mut self, data_str: &'a str) {
         match self.type_ {
             crate::DataType::Int32 => {
-                self.data = Some(crate::Data::Int32(
-                    data_str.parse::<i32>().expect("Failed to parse int"),
-                ));
+                self.data = Data::Int32 {
+                    val: data_str.parse::<i32>().expect("Failed to parse int"),
+                };
             }
             crate::DataType::Float64 => {
-                self.data = Some(crate::Data::Float64(
-                    data_str.parse::<f64>().expect("Failed to parse float"),
-                ));
+                self.data = Data::Float64 {
+                    val: data_str.parse::<f64>().expect("Failed to parse float"),
+                };
             }
             crate::DataType::Str => {
-                self.data = Some(crate::Data::Str(Box::new(data_str.to_owned())));
+                self.data = Data::Str {
+                    val: Box::new(data_str.to_owned()),
+                };
             }
             crate::DataType::Char => {
-                self.data = Some(crate::Data::Char(
-                    data_str.chars().next().expect("Failed to parse char"),
-                ));
+                self.data = Data::Char {
+                    val: data_str.chars().next().expect("Failed to parse char"),
+                };
             }
             crate::DataType::Bool => {
                 panic!(
@@ -41,7 +47,9 @@ impl<'a> Literal {
                 )
             }
             crate::DataType::Empty => {
-                panic!("Empty literals should be set directly as lexer::Literal::Empty is of type ()")
+                panic!(
+                    "Empty literals should be set directly as lexer::Literal::Empty is of type ()"
+                )
             }
         }
     }
@@ -435,7 +443,7 @@ impl<'a> Parser<'a> {
                                 (*ident).to_owned(),
                             )))
                         }
-                    },
+                    }
                     lexer::Token::Literal(lit) => {
                         use lexer::Literal as LexerLiteral;
 
@@ -462,7 +470,7 @@ impl<'a> Parser<'a> {
                             }
                             LexerLiteral::Bool(data) => {
                                 let mut literal = Literal::new(crate::DataType::Bool);
-                                literal.data = Some(crate::Data::Bool(*data));
+                                literal.data = Data::Bool { val: *data };
                                 Box::new(AstNode::Expression(Expression::Literal(literal)))
                             }
                         }

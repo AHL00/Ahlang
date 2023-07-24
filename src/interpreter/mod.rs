@@ -1,5 +1,5 @@
 use crate::parser::{AstNode, Expression, Statement, Ast};
-use crate::{parser, Data, Operator};
+use crate::{parser, Data, Operator, FnArg};
 use std::collections::HashMap;
 
 mod opers;
@@ -12,18 +12,27 @@ pub(crate) struct Var {
     pub mut_: bool,
 }
 
+#[derive(Debug)]
+pub(crate) struct Function {
+    pub args: Vec<FnArg>,
+    pub block: Box<Ast>,
+}
+
 pub struct Interpreter {
     pub(crate) vars: HashMap<String, Var>,
+    pub(crate) functions: HashMap<String, Function>,
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
         Interpreter {
             vars: HashMap::new(),
+            functions: HashMap::new(),
         }
     }
 
-    pub fn run(&mut self, ast: &parser::Ast) -> Result<(), String> {
+    pub fn run(&mut self, ast: &Ast) -> Result<(), String> {
+
         if ast.root.len() == 0 {
             return Err("AST is empty".to_string());
         }

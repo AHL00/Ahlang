@@ -183,6 +183,12 @@ impl DataType {
     }
 }
 
+#[derive(Debug)]
+struct FnArg {
+    identifier: Box<String>,
+    type_: DataType,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum Operator {

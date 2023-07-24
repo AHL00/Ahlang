@@ -1,5 +1,5 @@
 use crate::lexer::{self, Token};
-use crate::Data;
+use crate::{Data, DataType, FnArg};
 
 // TODO: Proper errors and code cleanup
 
@@ -77,6 +77,11 @@ pub(crate) enum Statement {
     },
     Else,
     Return,
+    DefineFn {
+        identifier: String,
+        arguments: Vec<FnArg>,
+        block: Box<Ast>,
+    },
     None,
 }
 
@@ -258,6 +263,28 @@ impl Ast {
                         self.print_recursive(node, format!("{}    ", &current_indent), false);
                     }
                 }
+                Statement::DefineFn {
+                    identifier,
+                    arguments,
+                    block,
+                } => {
+                    let current_indent = if is_last {
+                        indent
+                    } else {
+                        format!("{}", &indent)
+                    };
+                    println!("{}DEFINE FN", &current_indent);
+                    println!("{}├── identifier: {}", &current_indent, identifier);
+                    println!("{}├── arguments:", &current_indent);
+                    for arg in arguments {
+                        println!("{}│   ├── identifier: {}", &current_indent, arg.identifier);
+                        println!("{}│   └── type: {:?}", &current_indent, arg.type_);
+                    }
+                    println!("{}└── [BLOCK]", &current_indent);
+                    for node in &block.root {
+                        self.print_recursive(node, format!("{}    ", &current_indent), false);
+                    }
+                }
                 Statement::Else => println!("{}ELSE", &indent),
                 Statement::Return => println!("{}RETURN", &indent),
                 Statement::None => println!("{}NONE", &indent),
@@ -283,6 +310,7 @@ pub struct Parser<'a> {
     tokens: &'a lexer::Tokens<'a>,
     current_token: usize,
 }
+
 
 impl<'a> Parser<'a> {
     pub fn new() -> Parser<'a> {
@@ -547,7 +575,7 @@ impl<'a> Parser<'a> {
         self.current_token += 1;
 
         // next token is identifier
-        let ident: String = match &self.tokens.vec[self.current_token] {
+        let identifier: String = match &self.tokens.vec[self.current_token] {
             lexer::Token::Ident(ident) => (*ident).to_owned(),
             _ => {
                 return Err("[E010] Expected identifier after fn".to_string());
@@ -560,10 +588,58 @@ impl<'a> Parser<'a> {
             return Err("[E005] Expected left paren after function identifier".to_string());
         }
 
-        // next token is right paren
-        self.current_token += 1;
-        if self.tokens.vec[self.current_token] != lexer::Token::RParen {
-            return Err("[E006] Expected right paren".to_string());
+        let mut args_exist = false;
+        if self.peek() != &lexer::Token::RParen {
+            args_exist = true;
+        }
+
+        let mut arguments = Vec::new();
+        if args_exist {
+            loop {
+                self.current_token += 1;
+                // check if next token is right paren
+
+                // next token is identifier
+                let ident: String = match &self.tokens.vec[self.current_token] {
+                    lexer::Token::Ident(ident) => (*ident).to_owned(),
+                    _ => {
+                        return Err(format!(
+                            "Expected identifier, got {:?}",
+                            self.tokens.vec[self.current_token]
+                        ));
+                    }
+                };
+
+                // next token is colon
+                self.current_token += 1;
+                if self.tokens.vec[self.current_token] != lexer::Token::Colon {
+                    return Err("[E015] Expected colon after identifier".to_string());
+                }
+
+                // next token is type
+                self.current_token += 1;
+                let type_: DataType = match &self.tokens.vec[self.current_token] {
+                    lexer::Token::Type(type_) => {
+                        DataType::from_str(*type_).expect("Failed to parse type")
+                    }
+                    _ => {
+                        return Err("[E012] Expected type after colon".to_string());
+                    }
+                };
+
+                // if there is a comma, continue
+                self.current_token += 1;
+                if self.tokens.vec[self.current_token] == lexer::Token::Comma {
+                    continue;
+                } else if self.tokens.vec[self.current_token] == lexer::Token::RParen {
+                    break;
+                }
+
+                arguments.push(FnArg {
+                    identifier: Box::new(ident),
+                    type_,
+                });
+            }
         }
 
         // next token is left brace
@@ -576,8 +652,11 @@ impl<'a> Parser<'a> {
         let block = self.parse_block()?;
 
         // finishes after } or ;
-
-        Ok(AstNode::Statement(Statement::None))
+        Ok(AstNode::Statement(Statement::DefineFn {
+            identifier,
+            arguments,
+            block,
+        }))
     }
 
     fn parse_assign(&mut self) -> Result<AstNode, String> {

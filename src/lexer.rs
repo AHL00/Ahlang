@@ -23,6 +23,8 @@ pub(crate) enum Token<'a> {
     Literal(Literal<'a>),
     Function(&'a str),
 
+    /// Guaranteed to be a valid type
+    /// TODO: Custom types
     Type(&'a str),
 
     // Built-in functions
@@ -334,6 +336,7 @@ impl<'a> Lexer<'a> {
                     continue;
                 } else if crate::BUILT_IN_TYPES.contains(&literal) {
                     // If the literal is a built-in type, we add a type token
+                    // NOTE: For classes, maybe create a hashmap for custom types
                     self.tokens.vec.push(Token::Type(literal));
                     continue;
                 } else if crate::BUILT_IN_FUNCS.contains(&literal) {

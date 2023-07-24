@@ -113,14 +113,45 @@ pub(crate) struct Scope {
     pub(crate) functions: Vec<Function>
 }
 
+impl Scope {
+    pub fn new() -> Scope {
+        Scope {
+            variables: Vec::new(),
+            functions: Vec::new(),
+        }
+    }
+
+    pub fn get_var(&self, index: usize) -> &Var {
+        &self.variables[index]
+    }
+
+    pub fn get_fn(&self, index: usize) -> &Function {
+        &self.functions[index]
+    }
+
+    pub fn get_var_mut(&mut self, index: usize) -> &mut Var {
+        &mut self.variables[index]
+    }
+
+    pub fn drop_var(&mut self, index: usize) {
+        // set index to empty var
+        self.variables[index] = Var {
+            data: Data::Empty {},
+            type_: crate::DataType::Empty,
+            mut_: false,
+        };
+    }
+}
+
 #[derive(Debug)]
 pub struct Ast {
     pub(crate) root: Vec<AstNode>,
+    pub(crate) scope: Scope,
 }
 
 impl Ast {
-    pub const fn new() -> Ast {
-        Ast { root: Vec::new() }
+    pub fn new() -> Ast {
+        Ast { root: Vec::new(), scope: Scope::new() }
     }
 }
 

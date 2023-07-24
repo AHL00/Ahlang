@@ -1,4 +1,4 @@
-use crate::parser::{AstNode, Expression, Statement, Ast};
+use crate::parser::{AstNode, Expression, Statement, Ast, Scope};
 use crate::{Data, Operator, FnArg};
 use std::collections::HashMap;
 
@@ -19,15 +19,13 @@ pub(crate) struct Function {
 }
 
 pub struct Interpreter {
-    pub(crate) vars: HashMap<String, Var>,
-    pub(crate) functions: HashMap<String, Function>,
+
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
         Interpreter {
-            vars: HashMap::new(),
-            functions: HashMap::new(),
+
         }
     }
 
@@ -38,7 +36,7 @@ impl Interpreter {
         }
 
         for node in &ast.root {
-            let res = self.eval_statement(node);
+            let res = self.eval_statement(&ast.scope, node);
             if res.is_err() {
                 return Err(res.unwrap_err());
             }
@@ -47,37 +45,9 @@ impl Interpreter {
         Ok(())
     }
 
-    pub fn reset(&mut self) {
-        self.vars.clear();
-    }
-
-    pub fn dbg_get_vars(&self) -> Vec<(String, Data)> {
-        self.vars
-            .iter()
-            .map(|(k, v)| (k.clone(), v.data.clone()))
-            .collect()
-    }
-
-    #[inline(always)]
-    fn allocate_var(&mut self, identifier: &String, var: Var) {
-        self.vars.insert(identifier.to_owned(), var);
-    }
-
-    fn get_var(&self, identifier: &String) -> Option<&Var> {
-        self.vars.get(identifier)
-    }
-
-    fn get_var_mut(&mut self, identifier: &String) -> Option<&mut Var> {
-        self.vars.get_mut(identifier)
-    }
-
-    // fn delete_var(&mut self, identifier: &String) {
-    //     self.vars.remove(identifier);
-    // }
-
     fn eval_block(&mut self, block: &Box<Ast>) -> Result<(), String> {
         for node in &block.root {
-            let res = self.eval_statement(node);
+            let res = self.eval_statement(&block.scope, node);
             if res.is_err() {
                 return Err(res.unwrap_err());
             }
@@ -87,20 +57,20 @@ impl Interpreter {
     }
 
     // Recursive for nested statements
-    fn eval_statement(&mut self, node: &AstNode) -> Result<(), String> {
+    fn eval_statement(&mut self, scope: &Scope, node: &AstNode) -> Result<(), String> {
         match node {
             AstNode::Statement(stmt) => match stmt {
                 Statement::Alloc { identifier, type_, expr, mut_ } => {
-                    self.eval_stmt_alloc(identifier, type_, expr, *mut_)?;
+                    self.eval_stmt_alloc(scope, identifier, type_, expr, *mut_)?;
                 },
                 Statement::Assign { identifier, expr } => {
-                    self.eval_stmt_assign(identifier, expr)?;
+                    self.eval_stmt_assign(scope, identifier, expr)?;
                 },
                 Statement::If { expr, block } => {
-                    self.eval_stmt_if(expr, block)?;
+                    self.eval_stmt_if(scope, expr, block)?;
                 },
                 Statement::While { expr, block } => {
-                    self.eval_stmt_while(expr, block)?;
+                    self.eval_stmt_while(scope, expr, block)?;
                 },
                 Statement::None => {
                     // do nothing
@@ -116,8 +86,8 @@ impl Interpreter {
         Ok(())
     }
 
-    fn eval_stmt_if(&mut self, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
-        let data = self.eval_expression(expr)?;
+    fn eval_stmt_if(&mut self, scope: &Scope, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
+        let data = self.eval_expression(scope, expr)?;
 
         match data {
             Data::Bool { val: data } => {
@@ -133,19 +103,19 @@ impl Interpreter {
         Ok(())
     }
 
-    fn eval_stmt_while(&mut self, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
-        let mut data = self.eval_expression(expr)?;
+    fn eval_stmt_while(&mut self, scope: &Scope, expr: &Box<AstNode>, block: &Box<Ast>) -> Result<(), String> {
+        let mut data = self.eval_expression(scope, expr)?;
 
         while let Data::Bool { val: true } = data {
             self.eval_block(block)?;
-            data = self.eval_expression(expr)?;
+            data = self.eval_expression(&scope, expr)?;
         }
 
         Ok(())
     }
 
-    fn eval_stmt_assign(&mut self, identifier: &String, expr: &Box<AstNode>) -> Result<(), String> {
-        let data = self.eval_expression(expr)?;
+    fn eval_stmt_assign(&mut self, scope: &Scope, identifier: &String, expr: &Box<AstNode>) -> Result<(), String> {
+        let data = self.eval_expression(scope, expr)?;
 
         let var_mut = self.get_var_mut(identifier).ok_or("Variable not found".to_string())?;
 
@@ -166,13 +136,14 @@ impl Interpreter {
 
     fn eval_stmt_alloc(
         &mut self,
+        scope: &Scope,
         identifier: &String,
         type_: &crate::DataType,
         node: &Box<AstNode>,
         mut_: bool,
     ) -> Result<(), String> {
         // evaluate expression
-        let data = self.eval_expression(node)?;
+        let data = self.eval_expression(scope, node)?;
 
         // check if type matches
         if data.get_type() != *type_ {
@@ -192,7 +163,7 @@ impl Interpreter {
     // Recursive for nested expressions
     /// Evaluate, then return the data. Rust has RVO, so this should be fine.
     /// The Data is allocated in the caller's stack frame.
-    fn eval_expression(&mut self, node: &AstNode) -> Result<Data, String> {
+    fn eval_expression(&mut self, scope: &Scope, node: &AstNode) -> Result<Data, String> {
         match node {
             AstNode::Expression(expr) => match expr {
                 Expression::Literal(literal) => {
@@ -203,14 +174,14 @@ impl Interpreter {
                     }
                 }
                 Expression::Prefix { operator, right } => {
-                    return self.eval_prefix_expr(operator, right);
+                    return self.eval_prefix_expr(scope, operator, right);
                 }
                 Expression::Infix {
                     operator,
                     left,
                     right,
                 } => {
-                    return self.eval_infix_expr(operator, left, right);
+                    return self.eval_infix_expr(scope, operator, left, right);
                 }
                 Expression::VarIdentifier(identifier) => {
                     return self
@@ -230,6 +201,7 @@ impl Interpreter {
 
     fn eval_infix_expr(
         &mut self,
+        scope: &Scope,
         operator: &crate::Operator,
         left: &Box<AstNode>,
         right: &Box<AstNode>,
@@ -237,8 +209,8 @@ impl Interpreter {
         let data: Data;
 
         // evaluate expressions
-        let left = self.eval_expression(left)?;
-        let right = self.eval_expression(right)?;
+        let left = self.eval_expression(scope, left)?;
+        let right = self.eval_expression(scope, right)?;
 
         match operator {
             Operator::Plus => {
@@ -305,13 +277,14 @@ impl Interpreter {
 
     fn eval_prefix_expr(
         &mut self,
+        scope: &Scope,
         operator: &crate::Operator,
         right: &Box<AstNode>,
     ) -> Result<Data, String> {
         let data: Data;
 
         // evaluate expression
-        let res = self.eval_expression(right)?;
+        let res = self.eval_expression(scope, right)?;
 
         match operator {
             Operator::Negation => {

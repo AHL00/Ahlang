@@ -127,6 +127,10 @@ impl<'a> Lexer<'a> {
 
         self.tokens.vec.clear();
 
+        // To make it conform to block syntax, we add an opening brace to the token list
+        // This is to make it easier to parse the entire code like it's a block
+        self.tokens.vec.push(Token::LBrace);
+
         // set token literal to slice of input str
         let mut char_iter = self.input.char_indices().peekable();
 
@@ -445,6 +449,7 @@ impl<'a> Lexer<'a> {
             })
         }
 
+        self.tokens.vec.push(Token::RBrace);
         self.tokens.vec.push(Token::Eof);
 
         Ok(&self.tokens)

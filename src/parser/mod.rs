@@ -1,8 +1,12 @@
+use std::collections::HashMap;
+
+use crate::interpreter::{Var, Function};
 use crate::lexer::{self, Token};
 use crate::{Data, DataType, FnArg};
 
 mod print_ast;
 mod expr;
+pub(crate) use expr::Expression;
 
 // TODO: Proper errors and code cleanup
 
@@ -88,36 +92,6 @@ pub(crate) enum Statement {
     None,
 }
 
-fn binding_power(operator: &crate::Operator) -> (u8, u8) {
-    match operator {
-        crate::Operator::Plus | crate::Operator::Minus => (3, 4),
-
-        crate::Operator::Asterisk | crate::Operator::Slash | crate::Operator::Modulo => (5, 6),
-
-        crate::Operator::Caret => (7, 8),
-
-        // Comparison operators
-        crate::Operator::LessThan
-        | crate::Operator::GreaterThan
-        | crate::Operator::LessThanOrEqual
-        | crate::Operator::GreaterThanOrEqual
-        | crate::Operator::Equals
-        | crate::Operator::NotEqual => (1, 2),
-
-        // Logical operators
-        crate::Operator::And | crate::Operator::Or => (9, 10),
-
-        // Prefix
-        crate::Operator::Not => (0, 7),
-        crate::Operator::Identity => (0, 7),
-        crate::Operator::Negation => (0, 7),
-
-        _ => {
-            panic!("Unknown operator: {:?}", operator);
-        }
-    }
-}
-
 fn is_prefix_operator(operator: &crate::Operator) -> bool {
     match operator {
         crate::Operator::Not | crate::Operator::Identity | crate::Operator::Negation => true,
@@ -126,33 +100,17 @@ fn is_prefix_operator(operator: &crate::Operator) -> bool {
 }
 
 #[derive(Debug)]
-pub(crate) enum Expression {
-    VarIdentifier(String),
-    Literal(Literal),
-    Prefix {
-        operator: crate::Operator,
-        right: Box<AstNode>,
-    },
-    Postfix {
-        left: Box<AstNode>,
-        operator: crate::Operator,
-    },
-    Infix {
-        left: Box<AstNode>,
-        operator: crate::Operator,
-        right: Box<AstNode>,
-    },
-    FunctionCall {
-        // TODO: Optimization: Lexer immediately registers functions, replace string with function "pointer"
-        function: String,
-        arguments: Vec<Box<AstNode>>,
-    },
-}
-
-#[derive(Debug)]
 pub(crate) enum AstNode {
     Expression(Expression),
     Statement(Statement),
+}
+
+/// The var and fn identifiers will be stored as usize's in the ast
+/// These refer to the index of the variable in the scope's variables vector
+#[derive(Debug)]
+pub(crate) struct Scope {
+    pub(crate) variables: Vec<Var>,
+    pub(crate) functions: Vec<Function>
 }
 
 #[derive(Debug)]
@@ -179,7 +137,7 @@ impl std::fmt::Display for Ast {
 static EMPTY_TOKENS: lexer::Tokens = lexer::Tokens { vec: Vec::new() };
 
 pub struct Parser<'a> {
-    ast: Ast,
+    ast: Box<Ast>,
     tokens: &'a lexer::Tokens<'a>,
     current_token: usize,
 }
@@ -188,7 +146,7 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     pub fn new() -> Parser<'a> {
         Parser {
-            ast: Ast::new(),
+            ast: Box::new(Ast::new()),
             tokens: &EMPTY_TOKENS,
             current_token: 0,
         }
@@ -214,15 +172,7 @@ impl<'a> Parser<'a> {
             return Err("[E000] No tokens to parse".to_string());
         }
 
-        while self.current_token < self.tokens.vec.len() {
-            let res = self.parse_token();
-
-            if res.is_err() {
-                return Err(res.unwrap_err());
-            }
-
-            self.ast.root.push(res.unwrap());
-        }
+        self.ast = self.parse_block()?;
 
         Ok(&self.ast)
     }
@@ -232,11 +182,15 @@ impl<'a> Parser<'a> {
     }
 
     /// Starts at left brace and ends *after* right brace or semicolon if included
+    /// Used for main script and also blocks
     fn parse_block(&mut self) -> Result<Box<Ast>, String> {
         if self.tokens.vec[self.current_token] != lexer::Token::LBrace {
             return Err("[E009] Expected left brace at start of block".to_string());
         }
         self.current_token += 1;
+
+        let var_id_map: HashMap<String, usize> = HashMap::new();
+        let fn_id_map: HashMap<String, usize> = HashMap::new();
 
         let mut block = Box::new(Ast::new());
 
@@ -284,11 +238,11 @@ impl<'a> Parser<'a> {
             }
             lexer::Token::If => self.parse_if(),
             lexer::Token::While => self.parse_while(),
-            lexer::Token::Eof => {
-                // End the parser by moving the current token to the end
-                self.current_token += 1;
-                Ok(AstNode::Statement(Statement::None))
-            }
+            // lexer::Token::Eof => {
+            //     // End the parser by moving the current token to the end
+            //     self.current_token += 1;
+            //     Ok(AstNode::Statement(Statement::None))
+            // }
             _ => Err(format!(
                 "[E001] Unexpected token: {:?}",
                 self.tokens.vec[self.current_token]

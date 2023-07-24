@@ -1,5 +1,5 @@
 use crate::parser::{AstNode, Expression, Statement, Ast};
-use crate::{parser, Data, Operator, FnArg};
+use crate::{Data, Operator, FnArg};
 use std::collections::HashMap;
 
 mod opers;

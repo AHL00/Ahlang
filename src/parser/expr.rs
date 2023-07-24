@@ -1,5 +1,60 @@
 use super::*;
 
+fn binding_power(operator: &crate::Operator) -> (u8, u8) {
+    match operator {
+        crate::Operator::Plus | crate::Operator::Minus => (3, 4),
+
+        crate::Operator::Asterisk | crate::Operator::Slash | crate::Operator::Modulo => (5, 6),
+
+        crate::Operator::Caret => (7, 8),
+
+        // Comparison operators
+        crate::Operator::LessThan
+        | crate::Operator::GreaterThan
+        | crate::Operator::LessThanOrEqual
+        | crate::Operator::GreaterThanOrEqual
+        | crate::Operator::Equals
+        | crate::Operator::NotEqual => (1, 2),
+
+        // Logical operators
+        crate::Operator::And | crate::Operator::Or => (9, 10),
+
+        // Prefix
+        crate::Operator::Not => (0, 7),
+        crate::Operator::Identity => (0, 7),
+        crate::Operator::Negation => (0, 7),
+
+        _ => {
+            panic!("Unknown operator: {:?}", operator);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum Expression {
+    VarIdentifier(String),
+    Literal(Literal),
+    Prefix {
+        operator: crate::Operator,
+        right: Box<AstNode>,
+    },
+    Postfix {
+        left: Box<AstNode>,
+        operator: crate::Operator,
+    },
+    Infix {
+        left: Box<AstNode>,
+        operator: crate::Operator,
+        right: Box<AstNode>,
+    },
+    FunctionCall {
+        // TODO: Optimization: Lexer immediately registers functions, replace string with function "pointer"
+        function: String,
+        arguments: Vec<Box<AstNode>>,
+    },
+}
+
+
 /// Current token should be the token before the first token of the expression
 /// Ends at the token before the end_token
 impl<'a> Parser<'a> {

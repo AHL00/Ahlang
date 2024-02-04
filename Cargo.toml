@@ -6,16 +6,7 @@ edition = "2021"
 [lib]
 name = "ahlang"
 path = "src/lib.rs"
-crate-type = ["lib"]
 
 [dependencies]
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["html_reports"] }
-
-[[bench]]
-name = "while_iter"
-harness = false
-
-[workspace]
-members = ["bin"]

@@ -1,472 +1,333 @@
-use crate::Operator;
+use std::{error::Error, fmt::Display, iter::Peekable};
 
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Literal<'a> {
-    Int(&'a str),
-    Float(&'a str),
-    Str(&'a str),
-    Char(&'a str),
-    Bool(bool),
-}
+use crate::token::{Delimiter, Keyword, Literal, Operator, Punctuation, TokenType};
 
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Token<'a> {
-    Illegal,
-    // { TODO: Add line and column number to token to use in error messages
-    //     line: usize,
-    //     col: usize,
-    // },
-    Eof,
-
-    // Identifiers / literals / funcs
-    Ident(&'a str),
-    Literal(Literal<'a>),
-    Function(&'a str),
-
-    /// Guaranteed to be a valid type
-    /// TODO: Custom types
-    Type(&'a str),
-
-    // Built-in functions
-    BuiltInFunc(&'a str),
-
-    // Operators
-    Assign,
-    Operator(crate::Operator),
-    FatArrow,
-
-    // Delimiters
-    Comma,
-    Semicolon,
-    Colon,
-    DoubleQuote,
-    SingleQuote,
-
-    LParen,
-    RParen,
-    LBrace,
-    RBrace,
-    LSquare,
-    RSquare,
-
-    // Keywords
-    Fn,
-    Let,
-    Const,
-    If,
-    Else,
-    While,
-    Return,
-}
-
-pub(crate) const KEYWORDS: [&str; 9] = [
-    "fn", "let", "const", "if", "else", "while", "return", "true", "false",
-];
-pub(crate) const KEYWORDS_TOKENS: [Token; 9] = [
-    Token::Fn,
-    Token::Let,
-    Token::Const,
-    Token::If,
-    Token::Else,
-    Token::While,
-    Token::Return,
-    Token::Literal(Literal::Bool(true)),
-    Token::Literal(Literal::Bool(false)),
-];
-
-#[derive(Debug)]
-pub struct Tokens<'a> {
-    pub(crate) vec: Vec<Token<'a>>,
-}
-
-impl<'a> std::fmt::Display for Tokens<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut s = String::new();
-
-        for i in 0..self.vec.len() {
-            s.push_str(&format!("{:3} > {:?}\n", i, self.vec[i]));
-        }
-
-        write!(f, "{}", s)
-    }
-}
-
-pub struct Lexer<'a> {
-    input: &'a str,
-    tokens: Tokens<'a>,
+struct Lexer<'a> {
+    tokens: Vec<TokenType<'a>>,
+    /// Zero-based index of the current character.
+    current: usize,
+    line: usize,
+    first_char: bool,
+    chars: Peekable<std::str::Chars<'a>>,
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new() -> Lexer<'a> {
-        Lexer {
-            input: "",
-            tokens: Tokens { vec: Vec::new() },
-        }
+    fn peek(&mut self) -> Option<&char> {
+        self.chars.peek()
     }
 
-    pub fn get_tokens(&self) -> &Tokens {
-        &self.tokens
-    }
+    fn consume_char(&mut self) -> Option<char> {
+        let c = self.chars.next();
 
-    pub fn set_input(&mut self, input: &'a str) {
-        self.input = input;
-        self.reserve_tokens_vec(4)
-    }
-
-    /// Optimization: Reserve space for tokens vector
-    pub fn reserve_tokens_vec(&mut self, average_token_len: usize) {
-        self.tokens
-            .vec
-            .reserve(self.input.len() / average_token_len);
-    }
-
-    pub fn tokenize(&mut self) -> Result<&Tokens, String> {
-        if self.input == "" {
-            return Err("Empty input string".to_string());
-        }
-
-        self.tokens.vec.clear();
-
-        // set token literal to slice of input str
-        let mut char_iter = self.input.char_indices().peekable();
-
-        'tokenizer: loop {
-            // Get the next character of the input
-            let i = char_iter.next();
-
-            // If no more characters, end the loop
-            if i.is_none() {
-                break;
+        if let Some(c) = c {
+            if !self.first_char {
+                self.current += 1;
+            } else {
+                self.first_char = false;
             }
 
-            let (i, current_char) = i.unwrap();
-
-            // Ignore whitespace characters
-            if current_char.is_whitespace() {
-                continue;
+            if c == '\n' {
+                self.line += 1;
             }
+        }
 
-            // Ignore comments (contents after //)
-            if current_char == '/' {
-                let peek = char_iter.peek();
-                if peek.is_none() {
-                    return Err("Unexpected EOF".to_string());
+        c
+    }
+
+    pub fn lex(source: &'a String) -> Result<Lexer<'a>, LexerError> {
+        let mut lexer = Self {
+            tokens: Vec::new(),
+            current: 0,
+            line: 1,
+            first_char: true,
+            chars: source.chars().peekable(),
+        };
+
+        loop {
+            if let Some(c) = lexer.consume_char() {
+                if c.is_whitespace() {
+                    continue;
                 }
-                if peek.unwrap().1 == '/' {
-                    // Consuming all characters until the end of the line (end of comment)
-                    let mut next_char = char_iter.next();
 
-                    while next_char.is_some() {
-                        let (_, c) = next_char.unwrap();
+                if c.is_alphabetic() {
+                    // If the character is a letter, it's either an identifier or a keyword.
+                    let start = lexer.current;
 
-                        // If new line character found, end consuming comment
-                        if c == '\n' {
+                    // Consume the rest of the identifier.
+                    // _ is the only special character allowed in an identifier.
+                    while let Some(c) = lexer.peek() {
+                        if c.is_alphanumeric() || *c == '_' {
+                            lexer.consume_char();
+                        } else {
                             break;
                         }
+                    }
 
-                        next_char = char_iter.next();
+                    let identifier = &source[start..lexer.current + 1];
+
+                    // Check if it is a keyword.
+                    let keyword = Keyword::try_parse_token(identifier);
+
+                    if let Some(keyword) = keyword {
+                        lexer.tokens.push(TokenType::Keyword(keyword));
+                    } else {
+                        // If it's not a keyword, it's an identifier.
+                        lexer.tokens.push(TokenType::Identifier(identifier));
                     }
 
                     continue;
                 }
-            }
 
-            // Handle string literals within ""
-            if current_char == '"' {
-                let mut next_char = char_iter.next();
+                if c.is_numeric() {
+                    // If the first character is a number, it's a literal of some kind.
+                    let start = lexer.current;
 
-                if next_char.is_none() {
-                    return Err("Unexpected EOF".to_string());
-                }
+                    let mut contains_decimal = false;
 
-                let mut char_count = 1;
+                    // Consume the rest of the number.
+                    while let Some(c) = lexer.peek() {
+                        if c.is_numeric() || *c == '.' || *c == '_' {
+                            if *c == '.' {
+                                if contains_decimal {
+                                    return Err(LexerError::new(
+                                        lexer.line,
+                                        lexer.current,
+                                        start,
+                                        "Invalid number literal, two decimals found.".to_string(),
+                                    ));
+                                }
 
-                // Consume the characters inside the string literal
-                while next_char.is_some() {
-                    let (_, c) = next_char.unwrap();
+                                contains_decimal = true;
+                            }
 
-                    // If closing double quote found, end of string literal
-                    if c == '"' {
-                        break;
-                    }
-
-                    char_count += 1;
-                    next_char = char_iter.next();
-                }
-
-                // Add the string literal to the token list
-                self.tokens.vec.push(Token::Literal(Literal::Str(
-                    &self.input[i + 1..i + char_count],
-                )));
-                continue;
-            }
-
-            if current_char == '\'' {
-                // char literal
-                let mut next_char = char_iter.next();
-
-                if next_char.is_none() {
-                    return Err("Unexpected EOF".to_string());
-                }
-
-                let mut char_count = 1;
-
-                while next_char.is_some() {
-                    let (_, c) = next_char.unwrap();
-
-                    if c == '\'' {
-                        break;
-                    }
-
-                    char_count += 1;
-                    next_char = char_iter.next();
-                }
-
-                if next_char.is_none() {
-                    return Err("Unexpected EOF".to_string());
-                }
-
-                self.tokens.vec.push(Token::Literal(Literal::Char(
-                    &self.input[i + 1..i + char_count],
-                )));
-                continue;
-            }
-
-            // Peek
-            let peek_opt = char_iter.peek();
-            let mut peek = '\0';
-            if peek_opt.is_some() {
-                peek = peek_opt.unwrap().1;
-            }
-
-            if current_char.is_digit(10) {
-                // If the current character is a digit, we start processing a number literal
-                let mut next_char_digit = true;
-                let mut char_count = 1;
-                let mut float = false;
-                let mut decimal_included = false;
-            
-                while next_char_digit {
-                    // We keep processing characters as long as they are digits or special number characters
-                    let next_char = char_iter.peek();
-            
-                    if next_char.is_none() {
-                        // If there are no more characters, we break the loop
-                        break;
-                    }
-            
-                    let next_char = next_char.unwrap().1;
-            
-                    if next_char == '.' {
-                        // If the character is a dot, we are processing a float
-                        if decimal_included {
-                            // If we have already included a decimal point, this is an error
-                            return Err(format!(
-                                "Invalid float literal: {}",
-                                &self.input[i..i + char_count + 1]
-                            ));
+                            lexer.consume_char();
+                        } else {
+                            break;
                         }
-            
-                        float = true;
-                        decimal_included = true;
-            
-                        char_count += 1;
-                        char_iter.next();
-                    } else if next_char == '_' {
-                        // If the character is an underscore, we ignore it (it's allowed in number literals)
-                        char_count += 1;
-                        char_iter.next();
-                    } else if next_char.is_digit(10) {
-                        // If the character is a digit, we continue processing
-                        char_count += 1;
-                        char_iter.next();
-                    } else {
-                        // If the character is not a digit, dot, or underscore, we stop processing
-                        next_char_digit = false;
                     }
+
+                    let number_str = &source[start..lexer.current + 1];
+
+                    if contains_decimal {
+                        lexer
+                            .tokens
+                            .push(TokenType::Literal(Literal::Float(number_str)));
+                    } else {
+                        lexer
+                            .tokens
+                            .push(TokenType::Literal(Literal::Int(number_str)));
+                    }
+
+                    continue;
                 }
-            
-                if float {
-                    // If we processed a float, we add a float token
-                    self.tokens.vec.push(Token::Literal(Literal::Float(
-                        &self.input[i..i + char_count],
-                    )));
-                } else {
-                    // If we processed an integer, we add an integer token
-                    self.tokens
-                        .vec
-                        .push(Token::Literal(Literal::Int(&self.input[i..i + char_count])));
-                }
-            
-                continue;
-            } else if current_char.is_alphabetic() {
-                // If the current character is alphabetic, we start processing an identifier or keyword
-                let mut next_char_alhpanum = true;
-                let mut char_count = 1;
-            
-                while next_char_alhpanum {
-                    // We keep processing characters as long as they are alphanumeric
-                    let next_char = char_iter.peek();
-            
-                    if next_char.is_none() {
-                        // If there are no more characters, we break the loop
+
+                // Try parsing as any of the rest.
+                // If they all return None, then keep consuming the string until it is recognized.
+                // If it goes through the whole string and doesn't recognize it, then it's an error.
+                let start = lexer.current;
+
+                // TODO: Fix this ugly code.
+                // If there is something like "===" in the source code, it will be parsed as three
+                // "=". This is not the correct behavior.
+                // I think a better way to do this would be to pass the lexer to the try_parse_token
+                // function and let it consume the characters as needed.
+                // Maybe it shouldn't break immediately after finding a token, but keep consuming
+                // characters until it finds a token or reaches the end of the string.
+                // That's crazy inefficient though.
+                loop {
+                    let operator = Operator::try_parse_token(&source[start..lexer.current + 1]);
+
+                    if let Some(operator) = operator {
+                        lexer.tokens.push(TokenType::Operator(operator));
                         break;
                     }
-            
-                    let next_char = next_char.unwrap().1;
-            
-                    if next_char.is_alphanumeric() {
-                        // If the character is alphanumeric, we continue processing
-                        char_count += 1;
-                        char_iter.next();
-                    } else {
-                        // If the character is not alphanumeric, we stop processing
-                        next_char_alhpanum = false;
-                    }
-                }
-            
-                let literal = &self.input[i..i + char_count];
-            
-                let found_kwd = KEYWORDS.iter().position(|&s| s == literal);
-                if found_kwd.is_some() {
-                    // If the literal is a keyword, we add a keyword token
-                    self.tokens
-                        .vec
-                        .push(KEYWORDS_TOKENS[found_kwd.unwrap()].clone());
-                    continue;
-                } else if crate::BUILT_IN_TYPES.contains(&literal) {
-                    // If the literal is a built-in type, we add a type token
-                    // NOTE: For classes, maybe create a hashmap for custom types
-                    self.tokens.vec.push(Token::Type(literal));
-                    continue;
-                } else if crate::BUILT_IN_FUNCS.contains(&literal) {
-                    // If the literal is a built-in function, we add a function token
-                    self.tokens.vec.push(Token::BuiltInFunc(literal));
 
-                    continue;
-                } else {
-                    // Handled in parser now
-                    // // If the literal is not a keyword, built-in type, or built-in function, it's an identifier
-                    // if peek == '(' {
-                    //     // If the next character is an open parenthesis, this is a function call
-                    //     self.tokens.vec.push(Token::Function(literal));
-                    //     continue;
-                    // }
-            
-                    // Otherwise, it's a variable or other identifier
-                    self.tokens.vec.push(Token::Ident(literal));
-                    continue;
-                }
-            }            
+                    let punctuation =
+                        Punctuation::try_parse_token(&source[start..lexer.current + 1]);
 
-            self.tokens.vec.push(match (current_char, peek) {
-                ('+', _) => {
-                    if self.is_prefix() {
-                        Token::Operator(Operator::Identity)
-                    } else {
-                        Token::Operator(Operator::Plus)
+                    if let Some(punctuation) = punctuation {
+                        lexer.tokens.push(TokenType::Punctuation(punctuation));
+                        break;
+                    }
+
+                    let delimiter = Delimiter::try_parse_token(&source[start..lexer.current + 1]);
+
+                    if let Some(delimiter) = delimiter {
+                        lexer.tokens.push(TokenType::Delimiter(delimiter));
+                        break;
+                    }
+
+                    if let None = lexer.consume_char() {
+                        break;
                     }
                 }
-                ('-', _) => {
-                    if self.is_prefix() {
-                        Token::Operator(Operator::Negation)
-                    } else {
-                        Token::Operator(Operator::Minus)
-                    }
-                }
-                ('=', _) => match peek {
-                    '=' => {
-                        char_iter.next();
-                        Token::Operator(Operator::Equals)
-                    }
-                    '>' => {
-                        char_iter.next();
-                        Token::FatArrow
-                    }
-                    _ => Token::Assign,
-                },
-                ('*', _) => Token::Operator(Operator::Asterisk),
-                ('/', _) => Token::Operator(Operator::Slash),
-                ('!', _) => match peek {
-                    '=' => {
-                        char_iter.next();
-                        Token::Operator(Operator::NotEqual)
-                    }
-                    _ => Token::Operator(Operator::Not),
-                },
-                ('<', _) => match peek {
-                    '=' => {
-                        char_iter.next();
-                        Token::Operator(Operator::LessThanOrEqual)
-                    }
-                    '<' => {
-                        char_iter.next();
-                        Token::Operator(Operator::LeftShift)
-                    }
-                    _ => Token::Operator(Operator::LessThan),
-                },
-                ('>', _) => match peek {
-                    '=' => {
-                        char_iter.next();
-                        Token::Operator(Operator::GreaterThanOrEqual)
-                    }
-                    '>' => {
-                        char_iter.next();
-                        Token::Operator(Operator::RightShift)
-                    }
-                    _ => Token::Operator(Operator::GreaterThan),
-                },
-                ('&', _) => match peek {
-                    '&' => {
-                        char_iter.next();
-                        Token::Operator(Operator::And)
-                    }
-                    _ => Token::Operator(Operator::BitwiseAnd),
-                },
-                ('|', _) => match peek {
-                    '|' => {
-                        char_iter.next();
-                        Token::Operator(Operator::Or)
-                    }
-                    _ => Token::Operator(Operator::BitwiseOr),
-                },
-                ('%', _) => Token::Operator(Operator::Modulo),
-                ('^', _) => Token::Operator(Operator::Caret),
-                (',', _) => Token::Comma,
-                (';', _) => Token::Semicolon,
-                (':', _) => Token::Colon,
-                ('(', _) => Token::LParen,
-                (')', _) => Token::RParen,
-                ('{', _) => Token::LBrace,
-                ('}', _) => Token::RBrace,
-                ('[', _) => Token::LSquare,
-                (']', _) => Token::RSquare,
-                _ => Token::Illegal,
-            })
+            } else {
+                break;
+            }
         }
 
-        self.tokens.vec.push(Token::Eof);
+        Ok(lexer)
+    }
+}
 
-        Ok(&self.tokens)
+#[derive(Debug, PartialEq, Clone)]
+struct LexerError {
+    line: usize,
+    column: usize,
+    char: usize,
+    message: String,
+}
+
+impl LexerError {
+    fn new(line: usize, column: usize, char: usize, message: String) -> Self {
+        Self {
+            line,
+            column,
+            char,
+            message,
+        }
+    }
+}
+
+impl Display for LexerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Lexer error at line {}:{} (char {}): {}",
+            self.line, self.column, self.char, self.message
+        )
+    }
+}
+
+impl Error for LexerError {}
+
+trait TryParseToken: Sized {
+    fn try_parse_token(string: &str) -> Option<Self>;
+}
+
+impl TryParseToken for Keyword {
+    fn try_parse_token(string: &str) -> Option<Self> {
+        match string {
+            "if" => Some(Keyword::If),
+            "else" => Some(Keyword::Else),
+            "while" => Some(Keyword::While),
+            "for" => Some(Keyword::For),
+            "return" => Some(Keyword::Return),
+            "break" => Some(Keyword::Break),
+            "continue" => Some(Keyword::Continue),
+            "let" => Some(Keyword::Let),
+            "mut" => Some(Keyword::Mut),
+            "fn" => Some(Keyword::Fn),
+            "struct" => Some(Keyword::Struct),
+            "enum" => Some(Keyword::Enum),
+            "type" => Some(Keyword::Type),
+            "use" => Some(Keyword::Use),
+            "static" => Some(Keyword::Static),
+            "const" => Some(Keyword::Const),
+            "mod" => Some(Keyword::Mod),
+            "extern" => Some(Keyword::Extern),
+            _ => None,
+        }
+    }
+}
+
+impl TryParseToken for Punctuation {
+    fn try_parse_token(string: &str) -> Option<Self> {
+        match string {
+            "," => Some(Punctuation::Comma),
+            "." => Some(Punctuation::Dot),
+            ":" => Some(Punctuation::Colon),
+            ";" => Some(Punctuation::Semicolon),
+            "->" => Some(Punctuation::Arrow),
+            "=>" => Some(Punctuation::FatArrow),
+            _ => None,
+        }
+    }
+}
+
+impl TryParseToken for Delimiter {
+    fn try_parse_token(string: &str) -> Option<Self> {
+        match string {
+            "(" => Some(Delimiter::OpenParen),
+            ")" => Some(Delimiter::CloseParen),
+            "{" => Some(Delimiter::OpenBrace),
+            "}" => Some(Delimiter::CloseBrace),
+            "[" => Some(Delimiter::OpenBracket),
+            "]" => Some(Delimiter::CloseBracket),
+            _ => None,
+        }
+    }
+}
+
+impl TryParseToken for Operator {
+    fn try_parse_token(string: &str) -> Option<Self> {
+        match string {
+            "+" => Some(Operator::Add),
+            "-" => Some(Operator::Sub),
+            "*" => Some(Operator::Mul),
+            "/" => Some(Operator::Div),
+            "%" => Some(Operator::Modulus),
+            "&&" => Some(Operator::LogicalAnd),
+            "||" => Some(Operator::LogicalOr),
+            "!" => Some(Operator::LogicalNot),
+            "&" => Some(Operator::BitwiseAnd),
+            "|" => Some(Operator::BitwiseOr),
+            "^" => Some(Operator::BitwiseXor),
+            "~" => Some(Operator::BitwiseNot),
+            "<<" => Some(Operator::ShiftLeft),
+            ">>" => Some(Operator::ShiftRight),
+            "==" => Some(Operator::Equal),
+            "!=" => Some(Operator::NotEqual),
+            "<" => Some(Operator::LessThan),
+            ">" => Some(Operator::GreaterThan),
+            "<=" => Some(Operator::LessThanOrEqual),
+            ">=" => Some(Operator::GreaterThanOrEqual),
+            "=" => Some(Operator::Assign),
+            "+=" => Some(Operator::AddAssign),
+            "-=" => Some(Operator::SubAssign),
+            "*=" => Some(Operator::MulAssign),
+            "/=" => Some(Operator::DivAssign),
+            "%=" => Some(Operator::ModAssign),
+            "&=" => Some(Operator::AndAssign),
+            "|=" => Some(Operator::OrAssign),
+            "^=" => Some(Operator::XorAssign),
+            "<<=" => Some(Operator::ShlAssign),
+            ">>=" => Some(Operator::ShrAssign),
+            "++" => Some(Operator::Increment),
+            "--" => Some(Operator::Decrement),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lex() {
+        let source = String::from("let a = 5;");
+        let lexer = Lexer::lex(&source).unwrap();
+
+        print!("{:?}", lexer.tokens);
+
+        assert_eq!(
+            lexer.tokens,
+            vec![
+                TokenType::Keyword(Keyword::Let),
+                TokenType::Identifier("a"),
+                TokenType::Operator(Operator::Assign),
+                TokenType::Literal(Literal::Int("5")),
+                TokenType::Punctuation(Punctuation::Semicolon),
+            ]
+        );
     }
 
-    fn is_prefix(&self) -> bool {
-        let last = self.tokens.vec.last();
-        if last.is_none()
-            || !matches!(
-                last.unwrap(),
-                Token::Literal(_)
-                    | Token::Ident(_)
-                    | Token::RParen
-                    | Token::RSquare
-                    | Token::RBrace
-                    | Token::BuiltInFunc(_)
-                    | Token::Function(_)
-            )
-        {
-            return true;
-        } else {
-            return false;
-        }
+    #[test]
+    fn test_lex_error() {
+        let source = String::from("let a = 5.5.5;");
+        let lexer = Lexer::lex(&source);
+
+        assert!(lexer.is_err());
     }
 }

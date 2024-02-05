@@ -16,7 +16,6 @@ pub(crate) struct Token<'a> {
     pub(crate) token_type: TokenType<'a>,
     pub(crate) line: usize,
     pub(crate) column: usize,
-    pub(crate) char: usize,
 }
 
 

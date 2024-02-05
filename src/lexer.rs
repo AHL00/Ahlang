@@ -1,16 +1,18 @@
 use std::{error::Error, fmt::Display, iter::Peekable};
 
-use crate::token::{Delimiter, Keyword, Literal, Operator, Punctuation, TokenType};
+use crate::token::{Delimiter, Keyword, Literal, Operator, Punctuation, Token, TokenType};
 
 struct Lexer<'a> {
-    tokens: Vec<TokenType<'a>>,
+    tokens: Vec<Token<'a>>,
     /// Zero-based index of the current character.
     current: usize,
     line: usize,
+    column: usize,
     first_char: bool,
     chars: Peekable<std::str::Chars<'a>>,
 }
 
+#[allow(dead_code)]
 impl<'a> Lexer<'a> {
     fn peek(&mut self) -> Option<&char> {
         self.chars.peek()
@@ -28,17 +30,31 @@ impl<'a> Lexer<'a> {
 
             if c == '\n' {
                 self.line += 1;
+                self.column = 0;
+            } else {
+                self.column += 1;
             }
         }
 
         c
     }
 
-    pub fn lex(source: &'a String) -> Result<Lexer<'a>, LexerError> {
+    fn push_token(&mut self, token_type: TokenType<'a>) {
+        let token = Token {
+            token_type,
+            line: self.line,
+            column: self.column,
+        };
+
+        self.tokens.push(token);
+    }
+
+    pub fn lex(source: &'a String) -> Result<Vec<Token<'a>>, LexerError> {
         let mut lexer = Self {
             tokens: Vec::new(),
             current: 0,
             line: 1,
+            column: 0,
             first_char: true,
             chars: source.chars().peekable(),
         };
@@ -69,10 +85,10 @@ impl<'a> Lexer<'a> {
                     let keyword = Keyword::try_parse_token(identifier);
 
                     if let Some(keyword) = keyword {
-                        lexer.tokens.push(TokenType::Keyword(keyword));
+                        lexer.push_token(TokenType::Keyword(keyword));
                     } else {
                         // If it's not a keyword, it's an identifier.
-                        lexer.tokens.push(TokenType::Identifier(identifier));
+                        lexer.push_token(TokenType::Identifier(identifier));
                     }
 
                     continue;
@@ -91,8 +107,7 @@ impl<'a> Lexer<'a> {
                                 if contains_decimal {
                                     return Err(LexerError::new(
                                         lexer.line,
-                                        lexer.current,
-                                        start,
+                                        lexer.column,
                                         "Invalid number literal, two decimals found.".to_string(),
                                     ));
                                 }
@@ -109,140 +124,193 @@ impl<'a> Lexer<'a> {
                     let number_str = &source[start..lexer.current + 1];
 
                     if contains_decimal {
-                        lexer
-                            .tokens
-                            .push(TokenType::Literal(Literal::Float(number_str)));
+                        lexer.push_token(TokenType::Literal(Literal::Float(number_str)));
                     } else {
-                        lexer
-                            .tokens
-                            .push(TokenType::Literal(Literal::Int(number_str)));
+                        lexer.push_token(TokenType::Literal(Literal::Int(number_str)));
                     }
 
                     continue;
                 }
 
+                if c == '"' {
+                    // If the first character is a double quote, it's a string literal.
+                    let start = lexer.current + 1;
+
+                    // Consume the rest of the string.
+                    while let Some(c) = lexer.peek() {
+                        if *c == '"' {
+                            lexer.consume_char();
+                            break;
+                        } else {
+                            lexer.consume_char();
+                        }
+                    }
+
+                    let string_literal = &source[start..lexer.current];
+
+                    lexer.push_token(TokenType::Literal(Literal::Str(string_literal)));
+
+                    continue;
+                }
+
+                if c == '\'' {
+                    // If the first character is a single quote, it's a character literal.
+                    let start = lexer.current + 1;
+
+                    // Consume the rest of the character.
+                    while let Some(c) = lexer.peek() {
+                        if *c == '\'' {
+                            lexer.consume_char();
+                            break;
+                        } else {
+                            lexer.consume_char();
+                        }
+                    }
+
+                    let char_literal = &source[start..lexer.current];
+
+                    lexer.push_token(TokenType::Literal(Literal::Char(char_literal)));
+
+                    continue;
+                }
+
+
                 // Try parsing as any of the rest.
                 match c {
-                    '(' => lexer.tokens.push(TokenType::Delimiter(Delimiter::OpenParen)),
-                    ')' => lexer.tokens.push(TokenType::Delimiter(Delimiter::CloseParen)),
-                    '{' => lexer.tokens.push(TokenType::Delimiter(Delimiter::OpenBrace)),
-                    '}' => lexer.tokens.push(TokenType::Delimiter(Delimiter::CloseBrace)),
-                    '[' => lexer.tokens.push(TokenType::Delimiter(Delimiter::OpenBracket)),
-                    ']' => lexer.tokens.push(TokenType::Delimiter(Delimiter::CloseBracket)),
-                    ',' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Comma)),
-                    '.' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Dot)),
-                    ':' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Colon)),
-                    ';' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Semicolon)),
+                    '(' => lexer.push_token(TokenType::Delimiter(Delimiter::OpenParen)),
+                    ')' => lexer.push_token(TokenType::Delimiter(Delimiter::CloseParen)),
+                    '{' => lexer.push_token(TokenType::Delimiter(Delimiter::OpenBrace)),
+                    '}' => lexer.push_token(TokenType::Delimiter(Delimiter::CloseBrace)),
+                    '[' => lexer.push_token(TokenType::Delimiter(Delimiter::OpenBracket)),
+                    ']' => lexer.push_token(TokenType::Delimiter(Delimiter::CloseBracket)),
+                    ',' => lexer.push_token(TokenType::Punctuation(Punctuation::Comma)),
+                    '.' => lexer.push_token(TokenType::Punctuation(Punctuation::Dot)),
+                    ':' => lexer.push_token(TokenType::Punctuation(Punctuation::Colon)),
+                    ';' => lexer.push_token(TokenType::Punctuation(Punctuation::Semicolon)),
                     '+' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::AddAssign));
+                                lexer.push_token(TokenType::Operator(Operator::AddAssign));
                             } else if *c == '+' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::Increment));
+                                lexer.push_token(TokenType::Operator(Operator::Increment));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::Add));
+                                lexer.push_token(TokenType::Operator(Operator::Add));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::Add));
+                            lexer.push_token(TokenType::Operator(Operator::Add));
                         }
                     }
                     '-' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::SubAssign));
+                                lexer.push_token(TokenType::Operator(Operator::SubAssign));
+                            } else if *c == '>' {
+                                lexer.consume_char();
+                                lexer.push_token(TokenType::Punctuation(Punctuation::Arrow));
                             } else if *c == '-' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::Decrement));
+                                lexer.push_token(TokenType::Operator(Operator::Decrement));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::Sub));
+                                lexer.push_token(TokenType::Operator(Operator::Sub));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::Sub));
+                            lexer.push_token(TokenType::Operator(Operator::Sub));
                         }
                     }
                     '*' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::MulAssign));
+                                lexer.push_token(TokenType::Operator(Operator::MulAssign));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::Mul));
+                                lexer.push_token(TokenType::Operator(Operator::Mul));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::Mul));
+                            lexer.push_token(TokenType::Operator(Operator::Mul));
                         }
                     }
                     '/' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::DivAssign));
+                                lexer.push_token(TokenType::Operator(Operator::DivAssign));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::Div));
+                                lexer.push_token(TokenType::Operator(Operator::Div));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::Div));
+                            lexer.push_token(TokenType::Operator(Operator::Div));
                         }
                     }
                     '%' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::ModAssign));
+                                lexer.push_token(TokenType::Operator(Operator::ModAssign));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::Modulus));
+                                lexer.push_token(TokenType::Operator(Operator::Modulus));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::Modulus));
+                            lexer.push_token(TokenType::Operator(Operator::Modulus));
                         }
                     }
                     '&' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '&' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::LogicalAnd));
+                                lexer.push_token(TokenType::Operator(Operator::LogicalAnd));
                             } else if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::AndAssign));
+                                lexer.push_token(TokenType::Operator(Operator::AndAssign));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::BitwiseAnd));
+                                lexer.push_token(TokenType::Operator(Operator::BitwiseAnd));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::BitwiseAnd));
+                            lexer.push_token(TokenType::Operator(Operator::BitwiseAnd));
                         }
                     }
                     '|' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '|' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::LogicalOr));
+                                lexer.push_token(TokenType::Operator(Operator::LogicalOr));
                             } else if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::OrAssign));
+                                lexer.push_token(TokenType::Operator(Operator::OrAssign));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::BitwiseOr));
+                                lexer.push_token(TokenType::Operator(Operator::BitwiseOr));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::BitwiseOr));
+                            lexer.push_token(TokenType::Operator(Operator::BitwiseOr));
                         }
                     }
                     '^' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::XorAssign));
+                                lexer.push_token(TokenType::Operator(Operator::XorAssign));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::BitwiseXor));
+                                lexer.push_token(TokenType::Operator(Operator::BitwiseXor));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::BitwiseXor));
+                            lexer.push_token(TokenType::Operator(Operator::BitwiseXor));
                         }
                     }
-                    '~' => lexer.tokens.push(TokenType::Operator(Operator::BitwiseNot)),
-                    '!' => lexer.tokens.push(TokenType::Operator(Operator::LogicalNot)),
+                    '~' => lexer.push_token(TokenType::Operator(Operator::BitwiseNot)),
+                    '!' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.push_token(TokenType::Operator(Operator::NotEqual));
+                            } else {
+                                lexer.push_token(TokenType::Operator(Operator::LogicalNot));
+                            }
+                        } else {
+                            lexer.push_token(TokenType::Operator(Operator::LogicalNot));
+                        }
+                    }
                     '<' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '<' {
@@ -250,21 +318,21 @@ impl<'a> Lexer<'a> {
                                 if let Some(c) = lexer.peek() {
                                     if *c == '=' {
                                         lexer.consume_char();
-                                        lexer.tokens.push(TokenType::Operator(Operator::ShlAssign));
+                                        lexer.push_token(TokenType::Operator(Operator::ShlAssign));
                                     } else {
-                                        lexer.tokens.push(TokenType::Operator(Operator::ShiftLeft));
+                                        lexer.push_token(TokenType::Operator(Operator::ShiftLeft));
                                     }
                                 } else {
-                                    lexer.tokens.push(TokenType::Operator(Operator::ShiftLeft));
+                                    lexer.push_token(TokenType::Operator(Operator::ShiftLeft));
                                 }
                             } else if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::LessThanOrEqual));
+                                lexer.push_token(TokenType::Operator(Operator::LessThanOrEqual));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::LessThan));
+                                lexer.push_token(TokenType::Operator(Operator::LessThan));
                             }
-                        } else  {
-                            lexer.tokens.push(TokenType::Operator(Operator::LessThan));
+                        } else {
+                            lexer.push_token(TokenType::Operator(Operator::LessThan));
                         }
                     }
                     '>' => {
@@ -274,40 +342,42 @@ impl<'a> Lexer<'a> {
                                 if let Some(c) = lexer.peek() {
                                     if *c == '=' {
                                         lexer.consume_char();
-                                        lexer.tokens.push(TokenType::Operator(Operator::ShrAssign));
+                                        lexer.push_token(TokenType::Operator(Operator::ShrAssign));
                                     } else {
-                                        lexer.tokens.push(TokenType::Operator(Operator::ShiftRight));
+                                        lexer.push_token(TokenType::Operator(Operator::ShiftRight));
                                     }
                                 } else {
-                                    lexer.tokens.push(TokenType::Operator(Operator::ShiftRight));
+                                    lexer.push_token(TokenType::Operator(Operator::ShiftRight));
                                 }
                             } else if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::GreaterThanOrEqual));
+                                lexer.push_token(TokenType::Operator(Operator::GreaterThanOrEqual));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::GreaterThan));
+                                lexer.push_token(TokenType::Operator(Operator::GreaterThan));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::GreaterThan));
+                            lexer.push_token(TokenType::Operator(Operator::GreaterThan));
                         }
                     }
                     '=' => {
                         if let Some(c) = lexer.peek() {
                             if *c == '=' {
                                 lexer.consume_char();
-                                lexer.tokens.push(TokenType::Operator(Operator::Equal));
+                                lexer.push_token(TokenType::Operator(Operator::Equal));
+                            } else if *c == '>' {
+                                lexer.consume_char();
+                                lexer.push_token(TokenType::Punctuation(Punctuation::FatArrow));
                             } else {
-                                lexer.tokens.push(TokenType::Operator(Operator::Assign));
+                                lexer.push_token(TokenType::Operator(Operator::Assign));
                             }
                         } else {
-                            lexer.tokens.push(TokenType::Operator(Operator::Assign));
+                            lexer.push_token(TokenType::Operator(Operator::Assign));
                         }
                     }
                     _ => {
                         return Err(LexerError::new(
                             lexer.line,
-                            lexer.current,
-                            lexer.current,
+                            lexer.column,
                             format!("Unexpected character: {}", c),
                         ));
                     }
@@ -317,7 +387,7 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Ok(lexer)
+        Ok(lexer.tokens)
     }
 }
 
@@ -325,16 +395,14 @@ impl<'a> Lexer<'a> {
 struct LexerError {
     line: usize,
     column: usize,
-    char: usize,
     message: String,
 }
 
 impl LexerError {
-    fn new(line: usize, column: usize, char: usize, message: String) -> Self {
+    fn new(line: usize, column: usize, message: String) -> Self {
         Self {
             line,
             column,
-            char,
             message,
         }
     }
@@ -344,8 +412,8 @@ impl Display for LexerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Lexer error at line {}:{} (char {}): {}",
-            self.line, self.column, self.char, self.message
+            "Lexer error at line {}:{}: {}",
+            self.line, self.column, self.message
         )
     }
 }
@@ -389,12 +457,15 @@ mod tests {
     #[test]
     fn test_lex() {
         let source = String::from("let a = 5;");
-        let lexer = Lexer::lex(&source).unwrap();
+        let token_vec = Lexer::lex(&source).unwrap();
 
-        print!("{:?}", lexer.tokens);
+        let token_type_vec = token_vec
+            .iter()
+            .map(|token| token.token_type.clone())
+            .collect::<Vec<TokenType>>();
 
         assert_eq!(
-            lexer.tokens,
+            token_type_vec,
             vec![
                 TokenType::Keyword(Keyword::Let),
                 TokenType::Identifier("a"),
@@ -408,12 +479,15 @@ mod tests {
     #[test]
     fn test_multichar_operator() {
         let source = String::from("a += >>=");
-        let lexer = Lexer::lex(&source).unwrap();
+        let token_vec = Lexer::lex(&source).unwrap();
 
-        print!("{:?}", lexer.tokens);
+        let token_type_vec = token_vec
+            .iter()
+            .map(|token| token.token_type.clone())
+            .collect::<Vec<TokenType>>();
 
         assert_eq!(
-            lexer.tokens,
+            token_type_vec,
             vec![
                 TokenType::Identifier("a"),
                 TokenType::Operator(Operator::AddAssign),
@@ -423,10 +497,68 @@ mod tests {
     }
 
     #[test]
+    fn test_multiline() {
+        let source = String::from("a\nb");
+        let token_vec = Lexer::lex(&source).unwrap();
+
+        let token_type_vec = token_vec
+            .iter()
+            .map(|token| token.token_type.clone())
+            .collect::<Vec<TokenType>>();
+
+        assert_eq!(token_vec[0].line, 1);
+
+        assert_eq!(token_vec[1].line, 2);
+
+        assert_eq!(
+            token_type_vec,
+            vec![TokenType::Identifier("a"), TokenType::Identifier("b"),]
+        );
+    }
+
+    #[test]
     fn test_lex_error() {
         let source = String::from("let a = 5.5.5;");
         let lexer = Lexer::lex(&source);
 
         assert!(lexer.is_err());
+    }
+
+    #[test]
+    fn test_string_literal() {
+        let source = String::from("\"Hello, world!\";");
+        let token_vec = Lexer::lex(&source).unwrap();
+
+        let token_type_vec = token_vec
+            .iter()
+            .map(|token| token.token_type.clone())
+            .collect::<Vec<TokenType>>();
+
+        assert_eq!(
+            token_type_vec,
+            vec![
+                TokenType::Literal(Literal::Str("Hello, world!")),
+                TokenType::Punctuation(Punctuation::Semicolon),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_char_literal() {
+        let source = String::from("'a';");
+        let token_vec = Lexer::lex(&source).unwrap();
+
+        let token_type_vec = token_vec
+            .iter()
+            .map(|token| token.token_type.clone())
+            .collect::<Vec<TokenType>>();
+
+        assert_eq!(
+            token_type_vec,
+            vec![
+                TokenType::Literal(Literal::Char("a")),
+                TokenType::Punctuation(Punctuation::Semicolon),
+            ]
+        );
     }
 }

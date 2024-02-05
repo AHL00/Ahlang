@@ -81,6 +81,12 @@ impl<'a> Lexer<'a> {
 
                     let identifier = &source[start..lexer.current + 1];
 
+                    // Check if it is a boolean literal.
+                    if identifier == "true" || identifier == "false" {
+                        lexer.push_token(TokenType::Literal(Literal::Bool(identifier)));
+                        continue;
+                    }
+
                     // Check if it is a keyword.
                     let keyword = Keyword::try_parse_token(identifier);
 
@@ -557,6 +563,29 @@ mod tests {
             token_type_vec,
             vec![
                 TokenType::Literal(Literal::Char("a")),
+                TokenType::Punctuation(Punctuation::Semicolon),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_bool_literal() {
+        let source = String::from("let a = true false;");
+        let token_vec = Lexer::lex(&source).unwrap();
+
+        let token_type_vec = token_vec
+            .iter()
+            .map(|token| token.token_type.clone())
+            .collect::<Vec<TokenType>>();
+
+        assert_eq!(
+            token_type_vec,
+            vec![
+                TokenType::Keyword(Keyword::Let),
+                TokenType::Identifier("a"),
+                TokenType::Operator(Operator::Assign),
+                TokenType::Literal(Literal::Bool("true")),
+                TokenType::Literal(Literal::Bool("false")),
                 TokenType::Punctuation(Punctuation::Semicolon),
             ]
         );

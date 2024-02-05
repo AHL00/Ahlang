@@ -122,43 +122,194 @@ impl<'a> Lexer<'a> {
                 }
 
                 // Try parsing as any of the rest.
-                // If they all return None, then keep consuming the string until it is recognized.
-                // If it goes through the whole string and doesn't recognize it, then it's an error.
-                let start = lexer.current;
-
-                // TODO: Fix this ugly code.
-                // If there is something like "===" in the source code, it will be parsed as three
-                // "=". This is not the correct behavior.
-                // I think a better way to do this would be to pass the lexer to the try_parse_token
-                // function and let it consume the characters as needed.
-                // Maybe it shouldn't break immediately after finding a token, but keep consuming
-                // characters until it finds a token or reaches the end of the string.
-                // That's crazy inefficient though.
-                loop {
-                    let operator = Operator::try_parse_token(&source[start..lexer.current + 1]);
-
-                    if let Some(operator) = operator {
-                        lexer.tokens.push(TokenType::Operator(operator));
-                        break;
+                match c {
+                    '(' => lexer.tokens.push(TokenType::Delimiter(Delimiter::OpenParen)),
+                    ')' => lexer.tokens.push(TokenType::Delimiter(Delimiter::CloseParen)),
+                    '{' => lexer.tokens.push(TokenType::Delimiter(Delimiter::OpenBrace)),
+                    '}' => lexer.tokens.push(TokenType::Delimiter(Delimiter::CloseBrace)),
+                    '[' => lexer.tokens.push(TokenType::Delimiter(Delimiter::OpenBracket)),
+                    ']' => lexer.tokens.push(TokenType::Delimiter(Delimiter::CloseBracket)),
+                    ',' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Comma)),
+                    '.' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Dot)),
+                    ':' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Colon)),
+                    ';' => lexer.tokens.push(TokenType::Punctuation(Punctuation::Semicolon)),
+                    '+' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::AddAssign));
+                            } else if *c == '+' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::Increment));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::Add));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::Add));
+                        }
                     }
-
-                    let punctuation =
-                        Punctuation::try_parse_token(&source[start..lexer.current + 1]);
-
-                    if let Some(punctuation) = punctuation {
-                        lexer.tokens.push(TokenType::Punctuation(punctuation));
-                        break;
+                    '-' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::SubAssign));
+                            } else if *c == '-' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::Decrement));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::Sub));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::Sub));
+                        }
                     }
-
-                    let delimiter = Delimiter::try_parse_token(&source[start..lexer.current + 1]);
-
-                    if let Some(delimiter) = delimiter {
-                        lexer.tokens.push(TokenType::Delimiter(delimiter));
-                        break;
+                    '*' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::MulAssign));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::Mul));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::Mul));
+                        }
                     }
-
-                    if let None = lexer.consume_char() {
-                        break;
+                    '/' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::DivAssign));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::Div));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::Div));
+                        }
+                    }
+                    '%' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::ModAssign));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::Modulus));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::Modulus));
+                        }
+                    }
+                    '&' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '&' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::LogicalAnd));
+                            } else if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::AndAssign));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::BitwiseAnd));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::BitwiseAnd));
+                        }
+                    }
+                    '|' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '|' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::LogicalOr));
+                            } else if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::OrAssign));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::BitwiseOr));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::BitwiseOr));
+                        }
+                    }
+                    '^' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::XorAssign));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::BitwiseXor));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::BitwiseXor));
+                        }
+                    }
+                    '~' => lexer.tokens.push(TokenType::Operator(Operator::BitwiseNot)),
+                    '!' => lexer.tokens.push(TokenType::Operator(Operator::LogicalNot)),
+                    '<' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '<' {
+                                lexer.consume_char();
+                                if let Some(c) = lexer.peek() {
+                                    if *c == '=' {
+                                        lexer.consume_char();
+                                        lexer.tokens.push(TokenType::Operator(Operator::ShlAssign));
+                                    } else {
+                                        lexer.tokens.push(TokenType::Operator(Operator::ShiftLeft));
+                                    }
+                                } else {
+                                    lexer.tokens.push(TokenType::Operator(Operator::ShiftLeft));
+                                }
+                            } else if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::LessThanOrEqual));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::LessThan));
+                            }
+                        } else  {
+                            lexer.tokens.push(TokenType::Operator(Operator::LessThan));
+                        }
+                    }
+                    '>' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '>' {
+                                lexer.consume_char();
+                                if let Some(c) = lexer.peek() {
+                                    if *c == '=' {
+                                        lexer.consume_char();
+                                        lexer.tokens.push(TokenType::Operator(Operator::ShrAssign));
+                                    } else {
+                                        lexer.tokens.push(TokenType::Operator(Operator::ShiftRight));
+                                    }
+                                } else {
+                                    lexer.tokens.push(TokenType::Operator(Operator::ShiftRight));
+                                }
+                            } else if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::GreaterThanOrEqual));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::GreaterThan));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::GreaterThan));
+                        }
+                    }
+                    '=' => {
+                        if let Some(c) = lexer.peek() {
+                            if *c == '=' {
+                                lexer.consume_char();
+                                lexer.tokens.push(TokenType::Operator(Operator::Equal));
+                            } else {
+                                lexer.tokens.push(TokenType::Operator(Operator::Assign));
+                            }
+                        } else {
+                            lexer.tokens.push(TokenType::Operator(Operator::Assign));
+                        }
+                    }
+                    _ => {
+                        return Err(LexerError::new(
+                            lexer.line,
+                            lexer.current,
+                            lexer.current,
+                            format!("Unexpected character: {}", c),
+                        ));
                     }
                 }
             } else {
@@ -231,75 +382,6 @@ impl TryParseToken for Keyword {
     }
 }
 
-impl TryParseToken for Punctuation {
-    fn try_parse_token(string: &str) -> Option<Self> {
-        match string {
-            "," => Some(Punctuation::Comma),
-            "." => Some(Punctuation::Dot),
-            ":" => Some(Punctuation::Colon),
-            ";" => Some(Punctuation::Semicolon),
-            "->" => Some(Punctuation::Arrow),
-            "=>" => Some(Punctuation::FatArrow),
-            _ => None,
-        }
-    }
-}
-
-impl TryParseToken for Delimiter {
-    fn try_parse_token(string: &str) -> Option<Self> {
-        match string {
-            "(" => Some(Delimiter::OpenParen),
-            ")" => Some(Delimiter::CloseParen),
-            "{" => Some(Delimiter::OpenBrace),
-            "}" => Some(Delimiter::CloseBrace),
-            "[" => Some(Delimiter::OpenBracket),
-            "]" => Some(Delimiter::CloseBracket),
-            _ => None,
-        }
-    }
-}
-
-impl TryParseToken for Operator {
-    fn try_parse_token(string: &str) -> Option<Self> {
-        match string {
-            "+" => Some(Operator::Add),
-            "-" => Some(Operator::Sub),
-            "*" => Some(Operator::Mul),
-            "/" => Some(Operator::Div),
-            "%" => Some(Operator::Modulus),
-            "&&" => Some(Operator::LogicalAnd),
-            "||" => Some(Operator::LogicalOr),
-            "!" => Some(Operator::LogicalNot),
-            "&" => Some(Operator::BitwiseAnd),
-            "|" => Some(Operator::BitwiseOr),
-            "^" => Some(Operator::BitwiseXor),
-            "~" => Some(Operator::BitwiseNot),
-            "<<" => Some(Operator::ShiftLeft),
-            ">>" => Some(Operator::ShiftRight),
-            "==" => Some(Operator::Equal),
-            "!=" => Some(Operator::NotEqual),
-            "<" => Some(Operator::LessThan),
-            ">" => Some(Operator::GreaterThan),
-            "<=" => Some(Operator::LessThanOrEqual),
-            ">=" => Some(Operator::GreaterThanOrEqual),
-            "=" => Some(Operator::Assign),
-            "+=" => Some(Operator::AddAssign),
-            "-=" => Some(Operator::SubAssign),
-            "*=" => Some(Operator::MulAssign),
-            "/=" => Some(Operator::DivAssign),
-            "%=" => Some(Operator::ModAssign),
-            "&=" => Some(Operator::AndAssign),
-            "|=" => Some(Operator::OrAssign),
-            "^=" => Some(Operator::XorAssign),
-            "<<=" => Some(Operator::ShlAssign),
-            ">>=" => Some(Operator::ShrAssign),
-            "++" => Some(Operator::Increment),
-            "--" => Some(Operator::Decrement),
-            _ => None,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -319,6 +401,23 @@ mod tests {
                 TokenType::Operator(Operator::Assign),
                 TokenType::Literal(Literal::Int("5")),
                 TokenType::Punctuation(Punctuation::Semicolon),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_multichar_operator() {
+        let source = String::from("a += >>=");
+        let lexer = Lexer::lex(&source).unwrap();
+
+        print!("{:?}", lexer.tokens);
+
+        assert_eq!(
+            lexer.tokens,
+            vec![
+                TokenType::Identifier("a"),
+                TokenType::Operator(Operator::AddAssign),
+                TokenType::Operator(Operator::ShrAssign),
             ]
         );
     }

@@ -1,5 +1,7 @@
+use crate::SourceLocation;
+
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum TokenType<'a> {
+pub enum Token<'a> {
     Identifier(&'a str),
     Literal(Literal<'a>),
     Operator(Operator),
@@ -8,24 +10,13 @@ pub(crate) enum TokenType<'a> {
     Delimiter(Delimiter),
 }
 
-/// The token only include slices to the original string. 
-/// It doesn't do any sort of parsing of any kind.
-/// It allows the parser to get the source code location of each token.
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) struct Token<'a> {
-    pub(crate) token_type: TokenType<'a>,
-    pub(crate) line: usize,
-    pub(crate) column: usize,
-}
-
-
-#[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Operator {
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+pub enum Operator {
     Add,
-    Sub,
-    Mul,
-    Div,
-    Modulus,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
     LogicalAnd,
     LogicalOr,
     LogicalNot,
@@ -57,18 +48,18 @@ pub(crate) enum Operator {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Literal<'a> {
+pub enum Literal<'a> {
     /// Can contain underscores.
-    Int(&'a str),
+    Integer(&'a str),
     /// Can contain underscores and always a decimal point.
     Float(&'a str),
-    Str(&'a str),
+    String(&'a str),
     Char(&'a str),
-    Bool(&'a str),
+    Boolean(&'a str),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Punctuation {
+pub enum Punctuation {
     Comma,
     Dot,
     Colon,
@@ -78,7 +69,7 @@ pub(crate) enum Punctuation {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Delimiter {
+pub enum Delimiter {
     OpenParen,
     CloseParen,
     OpenBrace,
@@ -88,7 +79,7 @@ pub(crate) enum Delimiter {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum Keyword {
+pub enum Keyword {
     Fn,
     Let,
     If,

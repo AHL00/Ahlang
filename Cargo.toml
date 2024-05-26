@@ -8,5 +8,10 @@ name = "ahlang"
 path = "src/lib.rs"
 
 [dependencies]
+ariadne = "0.4.1"
+chumsky = "1.0.0-alpha.4"
+smol_str = "0.2.1"
+thiserror = "1.0.61"
 
-[dev-dependencies]
+[build-dependencies]
+cc = "*"

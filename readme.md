@@ -9,7 +9,6 @@ Ahlang is a statically and strongly typed scripting language with a syntax *very
 - [ ] OOP
 - [ ] REPL
 
-
 ## Syntax example
 ```rust
 fn example(y: i32) -> str {
@@ -29,12 +28,5 @@ fn example(y: i32) -> str {
     return "Hello, world!";
 };
 ```
-
-## Roadmap
-- [x] Lexer
-- [ ] Tree
-  - [ ] Idea for cache friendly tree
-- [ ] Parser
-  - [ ] Pratt parser for expressions
 
 
